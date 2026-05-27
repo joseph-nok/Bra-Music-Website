@@ -19,6 +19,7 @@ import type * as market from "../market.js";
 import type * as marketStock from "../marketStock.js";
 import type * as music from "../music.js";
 import type * as seed from "../seed.js";
+import type * as setfooter from "../setfooter.js";
 import type * as settings from "../settings.js";
 import type * as team from "../team.js";
 
@@ -40,6 +41,7 @@ declare const fullApi: ApiFromModules<{
   marketStock: typeof marketStock;
   music: typeof music;
   seed: typeof seed;
+  setfooter: typeof setfooter;
   settings: typeof settings;
   team: typeof team;
 }>;

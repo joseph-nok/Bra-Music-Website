@@ -1,17 +1,34 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery } from 'convex/react'
+import { useQuery } from '@tanstack/react-query'
+import { convexQuery } from '@convex-dev/react-query'
 import { useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import { X as XIcon } from 'lucide-react'
 
-export const Route = createFileRoute('/gallery')({ component: GalleryPage })
+export const Route = createFileRoute('/gallery')({
+  loader: async ({ context }) => {
+    await context.queryClient.ensureQueryData(
+      convexQuery(api.gallery.getAlbums, {}),
+    )
+  },
+  component: GalleryPage,
+})
 
-function GalleryPage() {
-  const albums = useQuery(api.gallery.getAlbums)
-  const [selectedAlbum, setSelectedAlbum] = useState<any>(null)
+export type GalleryAlbum = {
+  _id: string
+  category: string
+  dateAdded: string
+  coverImage: string
+  images: string[]
+}
 
-  // Wait for albums to load to prevent flickering between static and dynamic data
-  if (albums === undefined) {
+export function GalleryPage() {
+  const { data: albums, isPending } = useQuery({
+    ...convexQuery(api.gallery.getAlbums, {}),
+  })
+  const [selectedAlbum, setSelectedAlbum] = useState<GalleryAlbum | null>(null)
+
+  if (isPending || albums === undefined) {
     return (
       <main className="px-4 pb-20 pt-14 min-h-screen flex items-center justify-center">
         <div className="animate-pulse text-(--color-copy-muted) font-display text-xl uppercase tracking-widest">
@@ -33,10 +50,11 @@ function GalleryPage() {
           to view the full collection.
         </p>
 
-        <div className="mt-10 grid gap-6 md:grid-cols-12">
-          {albums.map((album: any, index: number) => (
+        <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-12">
+          {albums.map((album, index) => (
             <article
               key={album._id}
+              data-testid={`gallery-album-${album._id}`}
               onClick={() => setSelectedAlbum(album)}
               className={`gallery-tile cursor-pointer group ${
                 index % 4 === 0
@@ -74,9 +92,11 @@ function GalleryPage() {
         )}
       </section>
 
-      {/* Album Modal */}
-      {selectedAlbum && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
+      {selectedAlbum ? (
+        <div
+          data-testid="gallery-modal"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8"
+        >
           <div
             className="absolute inset-0 bg-black/90 backdrop-blur-xl"
             onClick={() => setSelectedAlbum(null)}
@@ -84,8 +104,10 @@ function GalleryPage() {
 
           <div className="relative z-10 w-full max-w-6xl max-h-[90vh] overflow-y-auto rounded-3xl border border-white/10 bg-zinc-950 p-6 sm:p-12 shadow-2xl custom-scrollbar">
             <button
+              type="button"
               onClick={() => setSelectedAlbum(null)}
-              className="absolute right-6 top-6 text-white/50 hover:text-white transition-colors"
+              className="touch-target-48 absolute right-6 top-6 text-white/50 hover:text-white transition-colors"
+              aria-label="Close album"
             >
               <XIcon size={32} />
             </button>
@@ -98,8 +120,7 @@ function GalleryPage() {
               <div className="h-1 w-20 bg-(--color-primary) rounded-full" />
             </div>
 
-            <div className="grid gap-6 sm:grid-cols-2">
-              {/* Main image */}
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div className="overflow-hidden rounded-2xl border border-white/5 bg-zinc-900 aspect-video group">
                 <img
                   src={selectedAlbum.coverImage}
@@ -108,8 +129,7 @@ function GalleryPage() {
                 />
               </div>
 
-              {/* Sub-images */}
-              {selectedAlbum.images?.map((imgUrl: string, idx: number) => (
+              {selectedAlbum.images.map((imgUrl, idx) => (
                 <div
                   key={idx}
                   className="overflow-hidden rounded-2xl border border-white/5 bg-zinc-900 aspect-video group"
@@ -123,14 +143,14 @@ function GalleryPage() {
               ))}
             </div>
 
-            {(!selectedAlbum.images || selectedAlbum.images.length === 0) && (
+            {selectedAlbum.images.length === 0 ? (
               <p className="text-(--color-copy-soft) text-center py-20">
                 More images coming soon to this category.
               </p>
-            )}
+            ) : null}
           </div>
         </div>
-      )}
+      ) : null}
     </main>
   )
 }

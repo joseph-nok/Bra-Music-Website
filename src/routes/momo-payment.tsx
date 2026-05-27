@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useMutation, useQuery } from 'convex/react'
-import { useState } from 'react'
+import { useQuery, useAction } from 'convex/react'
+import React, { Suspense, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 
@@ -16,6 +16,8 @@ export const Route = createFileRoute('/momo-payment')({
   component: MoMoPaymentPage,
 })
 
+const PaystackCheckout = React.lazy(() => import('../components/PaystackCheckout'))
+
 function MoMoPaymentPage() {
   const navigate = useNavigate()
   const convexApi = api as any
@@ -29,7 +31,7 @@ function MoMoPaymentPage() {
       ? { checkoutId: checkoutId as Id<'checkouts'> }
       : 'skip',
   )
-  const completeTestPayment = useMutation(convexApi.commerce.completeTestPayment)
+  const verifyPayment = useAction(convexApi.commerce.verifyPaystackPayment)
 
   if (!checkoutId) {
     return (
@@ -89,16 +91,33 @@ function MoMoPaymentPage() {
     )
   }
 
-  async function handleTestPayment() {
+  const paystackConfig = {
+    reference: `${checkout?._id}_${Date.now()}`,
+    email: checkout?.email || '',
+    amount: Math.round((checkout?.totalAmount || 0) * 100),
+    publicKey: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
+    currency: checkout?.currency || 'GHS',
+  }
+
+  const onSuccess = async (response: any) => {
     setIsPaying(true)
     try {
-      await completeTestPayment({ checkoutId: checkout._id })
+      await verifyPayment({
+        reference: response.reference,
+        checkoutId: checkout._id,
+      })
       setPaymentStep('success')
     } catch (error) {
       console.error(error)
+      alert('Payment verification failed. Please contact support.')
     } finally {
       setIsPaying(false)
     }
+  }
+
+  const onClose = () => {
+    setIsPaying(false)
+    console.log('Payment modal closed')
   }
 
   if (paymentStep === 'success') {
@@ -112,7 +131,7 @@ function MoMoPaymentPage() {
               Payment complete
             </h1>
             <p className="mt-3 text-center text-sm text-(--color-copy-soft)">
-              This was a simulated MoMo payment for development and testing.
+              Your Paystack payment was successfully processed.
             </p>
 
             <PaymentSummary checkout={checkout} className="mt-8" />
@@ -147,34 +166,34 @@ function MoMoPaymentPage() {
           Complete payment
         </h1>
         <p className="mt-3 text-sm text-(--color-copy-soft)">
-          Test mode — no real charge. Confirm below to simulate a successful MoMo
-          payment.
+          Complete your purchase securely via Paystack.
         </p>
 
         <article className="editorial-card mt-8 p-8">
-          <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-            <span className="font-semibold uppercase tracking-wider">Test only</span>
-            <p className="mt-1 text-amber-100/90">
-              In production, you would approve a prompt on +233{' '}
-              {checkout.momoNumber}. Here you can simulate that step.
+          <div className="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+            <span className="font-semibold uppercase tracking-wider">Secure Payment</span>
+            <p className="mt-1 text-emerald-100/90">
+              You will be redirected to Paystack to complete your payment securely.
             </p>
           </div>
 
           <PaymentSummary checkout={checkout} />
 
           <div className="mt-8 space-y-3">
-            <button
-              type="button"
-              disabled={isPaying || checkout.status === 'paid'}
-              onClick={() => void handleTestPayment()}
-              className="cta-primary w-full justify-center py-4 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isPaying
-                ? 'Processing…'
-                : checkout.status === 'paid'
-                  ? 'Already paid'
-                  : 'Simulate MoMo payment'}
-            </button>
+            <Suspense fallback={
+              <button disabled className="cta-primary w-full justify-center py-4 disabled:cursor-not-allowed disabled:opacity-50">
+                Loading payment...
+              </button>
+            }>
+              <PaystackCheckout
+                config={paystackConfig}
+                onSuccess={onSuccess}
+                onClose={onClose}
+                isPaying={isPaying}
+                isPaid={checkout.status === 'paid'}
+                onInitiate={() => setIsPaying(true)}
+              />
+            </Suspense>
             <button
               type="button"
               onClick={() => void navigate({ to: '/cart' })}

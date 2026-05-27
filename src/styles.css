@@ -1,7 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif:wght@400;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 @import 'tailwindcss';
+@source '../src/**/*.{ts,tsx}';
 
 :root {
+  --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Noto Serif', Georgia, serif;
   --color-bg: #151515;
   --color-bg-deep: #111111;
   --color-panel: rgba(42, 42, 42, 0.88);
@@ -14,11 +17,6 @@
   --color-primary-ink: #372700;
   --color-secondary: #a0102f;
   --color-secondary-deep: #7e0d26;
-}
-
-@theme inline {
-  --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
-  --font-display: 'Noto Serif', Georgia, serif;
 }
 
 html,
@@ -38,6 +36,11 @@ body {
 
 a {
   color: inherit;
+}
+
+.touch-target-48 {
+  min-width: 3rem;
+  min-height: 3rem;
 }
 
 .page-wrap {
@@ -72,10 +75,14 @@ a {
   padding-block: 0.35rem;
 }
 
-.site-header__links {
+.site-header__links--desktop {
   display: none;
   align-items: center;
   gap: 1.7rem;
+}
+
+.site-header__menu-trigger {
+  display: inline-flex;
 }
 
 .nav-link {
@@ -112,27 +119,32 @@ a {
   transform: scaleX(1);
 }
 
-.menu-trigger {
-  display: inline-flex;
-}
-
-@media (min-width: 768px) {
-  .menu-trigger {
-    display: none;
-  }
-}
-
 .site-header__icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  min-width: 3rem;
+  min-height: 3rem;
+  width: 3rem;
+  height: 3rem;
   border: 1px solid rgba(246, 195, 61, 0.25);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.03);
   color: var(--color-primary);
+  cursor: pointer;
   text-decoration: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (min-width: 768px) {
+  .site-header__links--desktop {
+    display: flex;
+  }
+
+  .site-header__icon.site-header__menu-trigger {
+    display: none;
+  }
 }
 
 .site-header__actions {
@@ -163,10 +175,14 @@ a {
 }
 
 .site-header__mobile-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
   width: 100%;
+  min-height: 3rem;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 0.45rem 0.9rem;
+  padding: 0.65rem 0.9rem;
   font-size: 0.64rem;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -175,6 +191,8 @@ a {
   text-align: right;
   color: var(--color-copy-soft);
   background: rgba(255, 255, 255, 0.03);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .site-header__mobile-link.is-active {
@@ -815,10 +833,6 @@ a {
 }
 
 @media (min-width: 768px) {
-  .site-header__links {
-    display: flex;
-  }
-
   .homepage-hero {
     min-height: 38rem;
   }

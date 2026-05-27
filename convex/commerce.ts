@@ -1,4 +1,5 @@
-import { mutation, query } from './_generated/server'
+import { mutation, query, action, internalMutation } from './_generated/server'
+import { internal } from './_generated/api'
 import { v } from 'convex/values'
 import type { Id } from './_generated/dataModel'
 
@@ -95,7 +96,7 @@ export const startCheckout = mutation({
     }
 
     // Generate payment reference from event
-    const generatedPaymentReference = `Purchase for ${eventTitle} from your website`
+    const generatedPaymentReference = `Purchase for ${eventTitle} ministry`
 
     const checkoutId = await ctx.db.insert('checkouts', {
       cartId: args.cartId,
@@ -125,6 +126,15 @@ export const startCheckout = mutation({
         lineTotal: item.lineTotal,
       })
 
+      // Decrement product stock and set inStock to false if stock reaches 0
+      const product = await ctx.db.get(item.marketProductId)
+      if (product) {
+        const remaining = product.stockQuantity - item.quantity
+        await ctx.db.patch(item.marketProductId, {
+          stockQuantity: remaining,
+          inStock: remaining > 0,
+        })
+      }
     }
 
     if (args.cartId) {
@@ -166,4 +176,34 @@ export const completeTestPayment = mutation({
     await ctx.db.patch(args.checkoutId, { status: 'paid' })
     return { checkoutId: args.checkoutId, status: 'paid' as const }
   },
+})
+
+export const completePaymentInternal = internalMutation({
+  args: { checkoutId: v.id('checkouts') },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.checkoutId, { status: 'paid' })
+  }
+})
+
+export const verifyPaystackPayment = action({
+  args: { 
+    reference: v.string(),
+    checkoutId: v.id('checkouts')
+  },
+  handler: async (ctx, args) => {
+    const secretKey = process.env.PAYSTACK_PRIVATE_KEY
+    if (!secretKey) throw new Error("PAYSTACK_PRIVATE_KEY is not configured")
+    
+    const response = await fetch(`https://api.paystack.co/transaction/verify/${args.reference}`, {
+      headers: {
+        Authorization: `Bearer ${secretKey}`
+      }
+    });
+    const data = await response.json();
+    if (data.status && data.data.status === 'success') {
+      await ctx.runMutation(internal.commerce.completePaymentInternal, { checkoutId: args.checkoutId });
+      return { success: true };
+    }
+    throw new Error('Payment verification failed');
+  }
 })

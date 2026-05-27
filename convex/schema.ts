@@ -156,4 +156,11 @@ export default defineSchema({
     unitPrice: v.number(),
     lineTotal: v.number(),
   }).index('by_checkoutId', ['checkoutId']),
+
+  setfooter: defineTable({
+    whatsapp: v.optional(v.string()),
+    youtube: v.optional(v.string()),
+    instagram: v.optional(v.string()),
+    tiktok: v.optional(v.string()),
+  }),
 })

@@ -48,6 +48,22 @@ export const seedInitialData = mutation({
       })
     }
 
+    // 2b. Events (for payment reference generation)
+    const hasEvents = (await ctx.db.query('events').take(1)).length > 0
+    if (!hasEvents || force) {
+      if (force) {
+        const existing = await ctx.db.query('events').take(50)
+        for (const row of existing) await ctx.db.delete(row._id)
+      }
+      await ctx.db.insert('events', {
+        title: 'Atmosphere of Worship 2024',
+        dateIso: '2024-12-15T17:00:00Z',
+        timeText: '5:00 PM UTC',
+        place: 'Independence Square, Accra',
+        isPublished: true,
+      })
+    }
+
     // 3. Gallery Albums & Images
     const hasGallery = (await ctx.db.query('galleryAibums').take(1)).length > 0
     if (!hasGallery || force) {
@@ -141,30 +157,9 @@ export const seedInitialData = mutation({
           inStock: true,
           stockQuantity: 75,
         },
-        {
-          productLine: 'merch' as const,
-          name: 'Hoodie',
-          category: 'Apparel',
-          description: 'Comfortable, warm hoodie perfect for ministry events and cold weather outings.',
-          image: 'https://images.unsplash.com/photo-1556821552-5ff41b2da8b7?auto=format&fit=crop&w=1200&q=80',
-          currency: 'GHS',
-          price: 350.00,
-          inStock: true,
-          stockQuantity: 40,
-        },
       ]
       for (const p of products) {
         await ctx.db.insert('marketProducts', p)
-      }
-    } else {
-      const existingProducts = await ctx.db.query('marketProducts').collect()
-      for (const product of existingProducts) {
-        if (!product.inStock || product.stockQuantity < 1) {
-          await ctx.db.patch(product._id, {
-            inStock: true,
-            stockQuantity: Math.max(product.stockQuantity, 50),
-          })
-        }
       }
     }
 

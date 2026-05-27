@@ -1,12 +1,21 @@
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-import { ConvexProvider } from 'convex/react' // 1. Import the Provider
-import { convex } from '../convex-client' // 2. Import your client instance
+import {
+  HeadContent,
+  Scripts,
+  createRootRouteWithContext,
+} from '@tanstack/react-router'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { ConvexProvider } from 'convex/react'
+import { convex, queryClient } from '../convex-client'
 import Footer from '../components/Footer'
 import Header from '../components/Header'
 
 import '../styles.css'
 
-export const Route = createRootRoute({
+export interface RouterContext {
+  queryClient: typeof queryClient
+}
+
+export const Route = createRootRouteWithContext<RouterContext>()({
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
@@ -31,9 +40,11 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body className="font-sans antialiased">
         {/* 3. Wrap the content so every route can access the DB */}
         <ConvexProvider client={convex}>
-          <Header />
-          {children}
-          <Footer />
+          <QueryClientProvider client={queryClient}>
+            <Header />
+            {children}
+            <Footer />
+          </QueryClientProvider>
         </ConvexProvider>
         <Scripts />
       </body>

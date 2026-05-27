@@ -6,11 +6,7 @@ type StockedProduct = {
   stockQuantity: number
 }
 
-/** Products are always sellable; stock fields are not used to block purchases. */
+/** Products are returned as-is with their actual stock quantities for accurate inventory display. */
 export function productForSale<T extends StockedProduct>(product: T): T {
-  return {
-    ...product,
-    inStock: true,
-    stockQuantity: MAX_CART_QUANTITY,
-  }
+  return product
 }

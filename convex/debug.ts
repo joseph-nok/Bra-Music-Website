@@ -8,7 +8,7 @@ export const checkGalleryData = query({
     return {
       albumsCount: albums.length,
       imagesCount: images.length,
-      albums: albums.map((a) => ({ id: a._id, title: a.title })),
+      albums: albums.map((a) => ({ id: a._id, category: a.category })),
       imagesSample: images.slice(0, 5),
     }
   },

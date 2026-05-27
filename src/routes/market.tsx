@@ -246,7 +246,7 @@ function MarketPage() {
           {productList.map((product) => {
             const lk = lineKey(product)
             const isFallback = product._id.startsWith('fallback-')
-            const canPurchase = isMarketPurchasesEnabled && !isFallback
+            const canPurchase = isMarketPurchasesEnabled && !isFallback && product.inStock && product.stockQuantity > 0
             const selectedVariant = variantMap[lk] ?? {
               color: 'Black',
               size: 'M',
@@ -280,6 +280,9 @@ function MarketPage() {
                   </p>
                   <p className="mt-3 text-lg font-bold text-(--color-primary)">
                     GHS {product.price}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-(--color-copy-soft)">
+                    Quantity left: <span className={product.inStock && product.stockQuantity > 10 ? 'text-emerald-400' : product.stockQuantity > 0 ? 'text-yellow-400' : 'text-red-400'}>{product.stockQuantity}</span>
                   </p>
                   <div className="mt-4 grid gap-3">
                     <label className="field-shell">

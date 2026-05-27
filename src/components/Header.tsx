@@ -19,6 +19,7 @@ export default function Header() {
   const [cartCount, setCartCount] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
   const headerRef = useRef<HTMLElement | null>(null)
+  const toggleMenu = () => setMenuOpen((prev) => !prev)
 
   useEffect(() => {
     const syncCart = () => {
@@ -52,7 +53,11 @@ export default function Header() {
           Baah Prosper Music
         </Link>
 
-        <div className="site-header__links">
+        <nav
+          data-testid="header-desktop-nav"
+          aria-label="Main"
+          className="site-header__links site-header__links--desktop"
+        >
           {navItems.map((item) => (
             <Link
               key={item.to}
@@ -63,12 +68,12 @@ export default function Header() {
               {item.label}
             </Link>
           ))}
-        </div>
+        </nav>
 
         <div className="site-header__actions">
           <Link
             to="/cart"
-            className="site-header__icon relative"
+            className="site-header__icon touch-target-48 relative"
             aria-label="Cart"
           >
             <ShoppingCart size={16} strokeWidth={2} />
@@ -80,9 +85,11 @@ export default function Header() {
           </Link>
           <button
             type="button"
-            className="site-header__icon menu-trigger"
+            data-testid="header-menu-trigger"
+            className="site-header__icon menu-trigger site-header__menu-trigger touch-target-48"
             aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-            onClick={() => setMenuOpen((prev) => !prev)}
+            aria-expanded={menuOpen}
+            onClick={toggleMenu}
           >
             {menuOpen ? (
               <X size={16} strokeWidth={2} />
@@ -94,13 +101,16 @@ export default function Header() {
       </nav>
 
       {menuOpen ? (
-        <div className="site-header__menu-panel">
+        <div
+          data-testid="header-mobile-menu"
+          className="site-header__menu-panel"
+        >
           <div className="site-header__mobile">
             {[...navItems, ...menuItems].map((item) => (
               <Link
                 key={item.to}
                 to={item.to}
-                className="site-header__mobile-link"
+                className="site-header__mobile-link touch-target-48 min-h-12"
                 activeProps={{
                   className: 'site-header__mobile-link is-active',
                 }}

@@ -1,25 +1,34 @@
 import { v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 
+const MAX_ALBUMS = 30
+const MAX_IMAGES_PER_ALBUM = 100
+
 export const getAlbums = query({
   args: {},
   handler: async (ctx) => {
-    const albums = await ctx.db.query('galleryAibums').order('desc').collect()
+    const albums = await ctx.db
+      .query('galleryAibums')
+      .withIndex('by_dateAdded')
+      .order('desc')
+      .take(MAX_ALBUMS)
 
-    const albumsWithImages = await Promise.all(
+    return await Promise.all(
       albums.map(async (album) => {
         const images = await ctx.db
           .query('albumImages')
           .withIndex('by_category', (q) => q.eq('category', album.category))
-          .collect()
+          .take(MAX_IMAGES_PER_ALBUM)
+
         return {
-          ...album,
+          _id: album._id,
+          category: album.category,
+          dateAdded: album.dateAdded,
+          coverImage: album.coverImage,
           images: images.map((img) => img.url),
         }
       }),
     )
-
-    return albumsWithImages
   },
 })
 
@@ -57,7 +66,7 @@ export const deleteAlbum = mutation({
       const images = await ctx.db
         .query('albumImages')
         .withIndex('by_category', (q) => q.eq('category', album.category))
-        .collect()
+        .take(MAX_IMAGES_PER_ALBUM)
 
       for (const image of images) {
         await ctx.db.delete(image._id)
@@ -71,11 +80,13 @@ export const addImageToAlbum = mutation({
   args: {
     category: v.string(),
     url: v.string(),
+    order: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert('albumImages', {
+    await ctx.db.insert('albumImages', {
       category: args.category,
       url: args.url,
+      order: args.order,
     })
   },
 })

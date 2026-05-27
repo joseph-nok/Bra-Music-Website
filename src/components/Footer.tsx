@@ -1,4 +1,6 @@
 import { Link } from '@tanstack/react-router'
+import { useQuery } from 'convex/react'
+import { api } from '../../convex/_generated/api'
 import {
   MessageCircle,
   CirclePlay,
@@ -20,6 +22,7 @@ const footerLinks = [
 
 export default function Footer() {
   const year = new Date().getFullYear()
+  const footerData = useQuery(api.setfooter.getSetFooter)
 
   return (
     <footer className="site-footer px-4 pb-10 pt-14">
@@ -68,33 +71,42 @@ export default function Footer() {
         <div>
           <p className="site-footer__heading">Follow Us / Contact Us</p>
           <div className="site-footer__socials">
-            <a href="#" className="site-footer__social" aria-label="Audio">
-              <MessageCircle size={15} />
-            </a>
-            <a
-              href="www.youtube.com/@Prosper_Baah"
-              className="site-footer__social"
-              aria-label="YouTube"
-            >
-              <CirclePlay size={15} />
-            </a>
-            <a href="#" className="site-footer__social" aria-label="Instagram">
-              <Instagram size={15} />
-            </a>
-            <a href="#" className="site-footer__social" aria-label="TikTok">
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+            {(!footerData || footerData.whatsapp) && (
+              <a href={footerData?.whatsapp || "#"} className="site-footer__social" aria-label="WhatsApp" target="_blank" rel="noreferrer">
+                <MessageCircle size={15} />
+              </a>
+            )}
+            {(!footerData || footerData.youtube) && (
+              <a
+                href={footerData?.youtube || "https://www.youtube.com/@Prosper_Baah"}
+                className="site-footer__social"
+                aria-label="YouTube"
+                target="_blank" rel="noreferrer"
               >
-                <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
-              </svg>
-            </a>
+                <CirclePlay size={15} />
+              </a>
+            )}
+            {(!footerData || footerData.instagram) && (
+              <a href={footerData?.instagram || "#"} className="site-footer__social" aria-label="Instagram" target="_blank" rel="noreferrer">
+                <Instagram size={15} />
+              </a>
+            )}
+            {(!footerData || footerData.tiktok) && (
+              <a href={footerData?.tiktok || "#"} className="site-footer__social" aria-label="TikTok" target="_blank" rel="noreferrer">
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
+                </svg>
+              </a>
+            )}
           </div>
         </div>
       </div>
