@@ -27,6 +27,14 @@ export const Route = createRootRouteWithContext<RouterContext>()({
           'Baah Prosper Music official site for ministry updates, music, gallery, and event invitations.',
       },
     ],
+    // 🛠️ THIS TELLS THE BROWSER TO USE YOUR FAVICON.PNG ASSET DIRECTLY
+    links: [
+      {
+        rel: 'icon',
+        type: 'image/png',
+        href: '/favicon.png',
+      },
+    ],
   }),
   shellComponent: RootDocument,
 })
