@@ -14,9 +14,7 @@ import {
 import type { CartItem, ProductLine } from '../lib/cart'
 import { MARKET_PURCHASES_ENABLED } from '../lib/site-flags'
 
-// Merch colors that are always selectable for standard products
 const DEFAULT_COLORS = ['Black', 'White'] as const
-
 const MAX_CART_QUANTITY = 99
 
 type ProductVariant = {
@@ -47,7 +45,6 @@ function lineKey(p: { _id: string; productLine: ProductLine }) {
   return `${p.productLine}:${p._id}`
 }
 
-/** Shown only while Convex is loading or unreachable; add buttons wait for database products. */
 const fallbackProducts: Product[] = [
   {
     _id: 'fallback-cap',
@@ -92,7 +89,6 @@ function MarketPage() {
   const products = useQuery(convexApi.market.listProducts) as
     | Product[]
     | undefined
-  // Single query for ALL product color images: { [productId]: { [colorName]: url } }
   const allColorImages = useQuery(api.merch.getAllColorImages) as
     | Record<string, Record<string, string>>
     | undefined
@@ -153,8 +149,8 @@ function MarketPage() {
       : MARKET_PURCHASES_ENABLED
 
   return (
-    <main className="px-4 pb-20 pt-14">
-      <section className="page-wrap">
+    <main className="px-0 sm:px-4 pb-20 pt-14">
+      <section className="page-wrap px-4 sm:px-0">
         <p className="eyebrow mb-3">Official Merchandise</p>
         <h1 className="font-display text-5xl font-bold tracking-[-0.04em] text-white sm:text-7xl">
           Market
@@ -187,16 +183,16 @@ function MarketPage() {
         ) : null}
 
         <div
-          className={`mt-10 grid gap-6 ${
+          className={`mt-10 grid gap-3 sm:gap-6 -mx-4 sm:mx-0 ${
             productList.length === 1
               ? 'grid-cols-1 max-w-md mx-auto justify-center'
-              : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+              : 'grid-cols-1 md:grid-cols-2'
           }`}
         >
           {productList.map((product) => {
             if (product.productLine === 'merch') {
               return (
-                <SlideshowProductCard
+                <MerchProductCard
                   key={lineKey(product)}
                   product={product}
                   isMarketPurchasesEnabled={isMarketPurchasesEnabled}
@@ -249,7 +245,7 @@ function MarketPage() {
   )
 }
 
-function SlideshowProductCard({
+function MerchProductCard({
   product,
   isMarketPurchasesEnabled,
   addCartItem,
@@ -283,68 +279,29 @@ function SlideshowProductCard({
     product.stockQuantity > 0
 
   const colors = ['black', 'red', 'white', 'yellow', 'blue'] as const
-  type ColorOption = typeof colors[number]
+  type ColorOption = (typeof colors)[number]
 
   const [currentColor, setCurrentColor] = useState<ColorOption>('black')
-  const [isAutoPlaying, setIsAutoPlaying] = useState(true)
-  const [blinkCount, setBlinkCount] = useState(0)
   const [selectedSize, setSelectedSize] = useState<
     'M' | 'L' | 'XL' | 'XXL' | 'XXXL'
   >('M')
   const [quantity, setQuantity] = useState(1)
 
-  // Slideshow interval and rapid blink logic
-  useEffect(() => {
-    if (!isAutoPlaying) return
-
-    if (blinkCount < 5) {
-      const timer = setTimeout(() => {
-        setCurrentColor((prev) => {
-          const currentIndex = colors.indexOf(prev)
-          const nextIndex = (currentIndex + 1) % colors.length
-          return colors[nextIndex]
-        })
-        setBlinkCount((prev) => prev + 1)
-      }, 200)
-      return () => clearTimeout(timer)
-    } else {
-      const timer = setInterval(() => {
-        setCurrentColor((prev) => {
-          const currentIndex = colors.indexOf(prev)
-          const nextIndex = (currentIndex + 1) % colors.length
-          return colors[nextIndex]
-        })
-      }, 3000)
-      return () => clearInterval(timer)
-    }
-  }, [isAutoPlaying, blinkCount])
-
-  // Handle manual color selection
-  const handleColorSelect = (color: ColorOption) => {
-    setIsAutoPlaying(false)
-    setBlinkCount(5) // Skip blinking when manually selecting
-    setCurrentColor(color)
-  }
-
-  const imagePath = `/merch/${currentColor}.png`
+  const currentIndex = colors.indexOf(currentColor)
 
   async function handleAddToCart() {
     setStatus('')
-
     if (!isMarketPurchasesEnabled) {
       setStatusTone('error')
       setStatus('Purchases are not available right now.')
       return
     }
-
     if (isFallback) {
       setStatusTone('error')
       setStatus('Store catalog is still syncing. Please try again shortly.')
       return
     }
-
     setAddingMap((prev) => ({ ...prev, [lk]: true }))
-
     try {
       const cartId = loadCartId()
       const persisted = (await addCartItem({
@@ -354,7 +311,6 @@ function SlideshowProductCard({
         color: currentColor,
         size: selectedSize,
       })) as PersistedCartResult
-
       saveCartId(persisted.cartId)
       const nextItem = persisted.item
       const existing = cartItems.find(
@@ -365,7 +321,6 @@ function SlideshowProductCard({
             itemKey(item) === itemKey(nextItem) ? nextItem : item,
           )
         : [...cartItems, nextItem]
-
       setCartItems(nextItems)
       saveCart(nextItems)
       setStatusTone('success')
@@ -390,38 +345,40 @@ function SlideshowProductCard({
 
   return (
     <article className="editorial-card overflow-hidden rounded-2xl flex flex-col h-full border border-white/5 bg-white/[0.02] backdrop-blur-md shadow-2xl transition-all duration-300 hover:border-white/10 hover:shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
-      <div className="relative aspect-square w-full overflow-hidden bg-white/5 flex items-center justify-center">
-        <img
-          key={imagePath}
-          src={imagePath}
-          alt={`${product.name} – ${currentColor}`}
-          className="h-full w-full object-contain object-center transition-all duration-500 transform hover:scale-105 p-4"
-        />
-        {/* Play/Pause overlay badge in the corner */}
-        <div className="absolute top-4 right-4 z-10">
-          <button
-            type="button"
-            onClick={() => {
-              setIsAutoPlaying((prev) => {
-                const next = !prev
-                if (next) {
-                  // If resuming, skip the intro blink count
-                  setBlinkCount(5)
-                }
-                return next
-              })
-            }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-xs font-semibold text-white/85 hover:text-white hover:bg-black/80 transition-all duration-200"
-          >
-            <span
-              className={`h-1.5 w-1.5 rounded-full ${
-                isAutoPlaying ? 'bg-emerald-400 animate-pulse' : 'bg-yellow-400'
-              }`}
-            />
-            {isAutoPlaying ? 'Slideshow Active' : 'Slideshow Paused'}
-          </button>
+      {/* Sliding image carousel — fixed height, flush to card edges */}
+      <div
+        className="relative overflow-hidden bg-white/5"
+        style={{ aspectRatio: '4/3', overflow: 'hidden' }}
+      >
+        <div
+          className="flex transition-transform duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]"
+          style={{
+            width: `${colors.length * 100}%`,
+            height: '100%',
+            transform: `translateX(-${(currentIndex / colors.length) * 100}%)`,
+          }}
+        >
+          {colors.map((c) => (
+            <div
+              key={c}
+              style={{ width: `${100 / colors.length}%`, height: '100%' }}
+            >
+              <img
+                src={`/merch/${c}.png`}
+                alt={`${product.name} – ${c}`}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  objectPosition: 'center top',
+                  display: 'block',
+                }}
+              />
+            </div>
+          ))}
         </div>
       </div>
+
       <div className="p-6 flex flex-col flex-grow">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -458,7 +415,7 @@ function SlideshowProductCard({
         </p>
 
         <div className="mt-4 flex flex-col gap-4 flex-grow">
-          {/* Color Selector Block */}
+          {/* Color Selector */}
           <div>
             <span className="text-xs font-bold uppercase tracking-[0.1em] text-(--color-copy-muted) block mb-2">
               Color
@@ -472,14 +429,12 @@ function SlideshowProductCard({
                   bgClass = 'bg-white border border-black/20'
                 else if (c === 'yellow') bgClass = 'bg-[#f6c33d]'
                 else if (c === 'blue') bgClass = 'bg-[#1d4ed8]'
-
                 const isActive = currentColor === c
-
                 return (
                   <button
                     key={c}
                     type="button"
-                    onClick={() => handleColorSelect(c)}
+                    onClick={() => setCurrentColor(c)}
                     title={`Select ${c}`}
                     className={`relative h-8 w-8 rounded-full transition-all duration-300 hover:scale-110 active:scale-95 flex items-center justify-center ${bgClass} ${
                       isActive
@@ -489,9 +444,7 @@ function SlideshowProductCard({
                   >
                     {isActive && (
                       <span
-                        className={`h-1.5 w-1.5 rounded-full ${
-                          c === 'white' ? 'bg-black' : 'bg-white'
-                        }`}
+                        className={`h-1.5 w-1.5 rounded-full ${c === 'white' ? 'bg-black' : 'bg-white'}`}
                       />
                     )}
                   </button>
@@ -500,7 +453,7 @@ function SlideshowProductCard({
             </div>
           </div>
 
-          {/* Size Selector Block */}
+          {/* Size Selector */}
           <div>
             <span className="text-xs font-bold uppercase tracking-[0.1em] text-(--color-copy-muted) block mb-2">
               Size
@@ -526,7 +479,7 @@ function SlideshowProductCard({
             </div>
           </div>
 
-          {/* Quantity Block */}
+          {/* Quantity */}
           <div className="field-shell mt-auto">
             <span className="field-label">Quantity</span>
             <div className="flex items-center justify-between gap-4 py-1">
@@ -630,17 +583,12 @@ function StandardProductCard({
     !isFallback &&
     product.inStock &&
     product.stockQuantity > 0
-  const selectedVariant = variantMap[lk] ?? {
-    color: 'Black',
-    size: 'M',
-  }
+  const selectedVariant = variantMap[lk] ?? { color: 'Black', size: 'M' }
 
-  // Resolve the image: prefer color-specific Convex storage URL
   const productColorMap = allColorImages?.[product._id] ?? {}
   const colorSpecificUrl = productColorMap[selectedVariant.color]
   const displayImage = colorSpecificUrl ?? product.image
 
-  // Build available color options: always Black+White, plus any uploaded extras
   const uploadedColors = Object.keys(productColorMap)
   const allColorOptions = Array.from(
     new Set([...DEFAULT_COLORS, ...uploadedColors]),
@@ -648,22 +596,18 @@ function StandardProductCard({
 
   async function handleAddToCart() {
     setStatus('')
-
     if (!isMarketPurchasesEnabled) {
       setStatusTone('error')
       setStatus('Purchases are not available right now.')
       return
     }
-
     if (isFallback) {
       setStatusTone('error')
       setStatus('Store catalog is still syncing. Please try again shortly.')
       return
     }
-
     const quantity = qtyMap[lk] ?? 1
     setAddingMap((prev) => ({ ...prev, [lk]: true }))
-
     try {
       const cartId = loadCartId()
       const persisted = (await addCartItem({
@@ -673,7 +617,6 @@ function StandardProductCard({
         color: selectedVariant.color,
         size: selectedVariant.size,
       })) as PersistedCartResult
-
       saveCartId(persisted.cartId)
       const nextItem = persisted.item
       const existing = cartItems.find(
@@ -684,7 +627,6 @@ function StandardProductCard({
             itemKey(item) === itemKey(nextItem) ? nextItem : item,
           )
         : [...cartItems, nextItem]
-
       setCartItems(nextItems)
       saveCart(nextItems)
       setStatusTone('success')
@@ -709,13 +651,20 @@ function StandardProductCard({
 
   return (
     <article className="editorial-card overflow-hidden rounded-2xl flex flex-col h-full border border-white/5 bg-white/[0.02] backdrop-blur-md shadow-2xl transition-all duration-300 hover:border-white/10 hover:shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
-      <div className="relative aspect-square w-full overflow-hidden bg-white/5 flex items-center justify-center">
+      <div style={{ aspectRatio: '4/3', overflow: 'hidden' }}>
         <img
           key={displayImage}
           src={displayImage}
           alt={`${product.name} – ${selectedVariant.color}`}
-          className="h-full w-full object-contain object-center transition-all duration-500 transform hover:scale-105 p-4"
-          style={{ opacity: 1 }}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            objectPosition: 'center top',
+            display: 'block',
+            transition: 'transform 0.5s',
+          }}
+          className="hover:scale-105"
         />
       </div>
       <div className="p-6 flex flex-col flex-grow">
@@ -826,10 +775,7 @@ function StandardProductCard({
                 onClick={() =>
                   setQtyMap((prev) => ({
                     ...prev,
-                    [lk]: Math.min(
-                      (prev[lk] ?? 1) + 1,
-                      MAX_CART_QUANTITY,
-                    ),
+                    [lk]: Math.min((prev[lk] ?? 1) + 1, MAX_CART_QUANTITY),
                   }))
                 }
                 className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/5 text-white transition-colors hover:bg-white/10 active:scale-95"
