@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { useMutation, useQuery } from 'convex/react'
+import { useMutation } from 'convex/react'
 import { Check, Minus, Plus, ShoppingCart } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../convex/_generated/api'
@@ -12,7 +12,8 @@ import {
   saveCartId,
 } from '../lib/cart'
 import type { CartItem, ProductLine } from '../lib/cart'
-import { MARKET_PURCHASES_ENABLED } from '../lib/site-flags'
+import { useMarketData } from '../context/MarketDataContext'
+import type { Product } from '../context/MarketDataContext'
 
 const DEFAULT_COLORS = ['Black', 'White'] as const
 const MAX_CART_QUANTITY = 99
@@ -20,19 +21,6 @@ const MAX_CART_QUANTITY = 99
 type ProductVariant = {
   color: string
   size: 'M' | 'L' | 'XL' | 'XXL' | 'XXXL'
-}
-
-type Product = {
-  _id: string
-  productLine: ProductLine
-  name: string
-  category: string
-  description: string
-  image: string
-  currency: string
-  price: number
-  inStock: boolean
-  stockQuantity: number
 }
 
 type PersistedCartResult = {
@@ -84,14 +72,77 @@ function itemKey(
   return `${item.productLine}:${item.productId}-${item.color}-${item.size}`
 }
 
+/* ── Skeleton shown while Convex subscriptions resolve on first load ───── */
+function MarketSkeleton() {
+  return (
+    <main className="px-0 sm:px-4 pb-20 pt-14">
+      <section className="page-wrap px-4 sm:px-0">
+        {/* Header skeleton */}
+        <div className="h-4 w-36 rounded-md bg-white/5 animate-pulse mb-3" />
+        <div className="h-14 w-72 rounded-xl bg-white/5 animate-pulse" />
+        <div className="mt-6 flex flex-wrap items-center gap-4">
+          <div className="h-11 w-28 rounded-xl bg-white/5 animate-pulse" />
+          <div className="h-11 w-40 rounded-xl bg-white/5 animate-pulse" />
+          <div className="h-11 w-28 rounded-xl bg-white/5 animate-pulse" />
+        </div>
+
+        {/* Product card skeletons */}
+        <div className="mt-10 grid gap-3 sm:gap-6 -mx-4 sm:mx-0 grid-cols-1 md:grid-cols-2">
+          {[0, 1].map((i) => (
+            <article
+              key={i}
+              className="overflow-hidden rounded-2xl flex flex-col border border-white/5 bg-white/[0.02] backdrop-blur-md"
+            >
+              {/* Image area */}
+              <div
+                className="bg-white/5 animate-pulse"
+                style={{ aspectRatio: '4/3' }}
+              />
+              {/* Content area */}
+              <div className="p-6 flex flex-col gap-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex flex-col gap-2">
+                    <div className="h-3 w-20 rounded bg-white/5 animate-pulse" />
+                    <div className="h-7 w-44 rounded-lg bg-white/5 animate-pulse" />
+                  </div>
+                  <div className="h-6 w-16 rounded-full bg-white/5 animate-pulse" />
+                </div>
+                <div className="h-4 w-full rounded bg-white/5 animate-pulse" />
+                <div className="h-4 w-3/4 rounded bg-white/5 animate-pulse" />
+                <div className="h-6 w-28 rounded bg-white/5 animate-pulse mt-1" />
+                <div className="h-4 w-36 rounded bg-white/5 animate-pulse" />
+                {/* Color dots skeleton */}
+                <div className="flex gap-3 mt-2">
+                  {[0, 1, 2].map((j) => (
+                    <div
+                      key={j}
+                      className="h-8 w-8 rounded-full bg-white/5 animate-pulse"
+                    />
+                  ))}
+                </div>
+                {/* Button skeleton */}
+                <div className="h-12 w-full rounded-xl bg-white/5 animate-pulse mt-3" />
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+    </main>
+  )
+}
+
 function MarketPage() {
+  // ── Data from the global context (never re-fetches on route changes) ──
+  const {
+    products,
+    allColorImages,
+    isMerchVisible,
+    isCapVisible,
+    isMarketPurchasesEnabled,
+    isLoading,
+  } = useMarketData()
+
   const convexApi = api as any
-  const products = useQuery(convexApi.market.listProducts) as
-    | Product[]
-    | undefined
-  const allColorImages = useQuery(api.merch.getAllColorImages) as
-    | Record<string, Record<string, string>>
-    | undefined
   const addCartItem = useMutation(convexApi.market.addCartItem)
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [qtyMap, setQtyMap] = useState<Record<string, number>>({})
@@ -114,18 +165,6 @@ function MarketPage() {
     }
   }, [])
 
-  const merchLineEnabled = useQuery(api.settings.getSetting, {
-    key: 'merchLineEnabled',
-  })
-  const capLineEnabled = useQuery(api.settings.getSetting, {
-    key: 'capLineEnabled',
-  })
-
-  const isMerchVisible =
-    merchLineEnabled !== null ? (merchLineEnabled as boolean) : true
-  const isCapVisible =
-    capLineEnabled !== null ? (capLineEnabled as boolean) : true
-
   const catalogProducts =
     products && products.length > 0 ? products : fallbackProducts
   const productList = catalogProducts.filter((product) => {
@@ -140,13 +179,8 @@ function MarketPage() {
   )
   const total = useMemo(() => cartTotal(cartItems), [cartItems])
 
-  const marketPurchasesEnabledSetting = useQuery(api.settings.getSetting, {
-    key: 'marketPurchasesEnabled',
-  })
-  const isMarketPurchasesEnabled =
-    marketPurchasesEnabledSetting !== null
-      ? (marketPurchasesEnabledSetting as boolean)
-      : MARKET_PURCHASES_ENABLED
+  // Show skeleton only on the very first load (context data is undefined)
+  if (isLoading) return <MarketSkeleton />
 
   return (
     <main className="px-0 sm:px-4 pb-20 pt-14">

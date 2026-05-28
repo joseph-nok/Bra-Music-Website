@@ -8,6 +8,7 @@ import { ConvexProvider } from 'convex/react'
 import { convex, queryClient } from '../convex-client'
 import Footer from '../components/Footer'
 import Header from '../components/Header'
+import { MarketDataProvider } from '../context/MarketDataContext'
 
 import '../styles.css'
 
@@ -46,12 +47,19 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body className="font-sans antialiased">
-        {/* 3. Wrap the content so every route can access the DB */}
         <ConvexProvider client={convex}>
           <QueryClientProvider client={queryClient}>
-            <Header />
-            {children}
-            <Footer />
+            {/*
+              MarketDataProvider lives inside ConvexProvider but OUTSIDE
+              individual routes. Its useQuery subscriptions are created once
+              when the app boots and never unmount — navigating between
+              /market and /cart costs zero extra round-trips.
+            */}
+            <MarketDataProvider>
+              <Header />
+              {children}
+              <Footer />
+            </MarketDataProvider>
           </QueryClientProvider>
         </ConvexProvider>
         <Scripts />

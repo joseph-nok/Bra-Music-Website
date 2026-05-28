@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useMutation, useQuery } from 'convex/react'
+import { useMutation } from 'convex/react'
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import GhanaPhoneField from '../components/GhanaPhoneField'
@@ -13,6 +13,7 @@ import {
 import type { FormEvent } from 'react'
 import type { Id } from '../../convex/_generated/dataModel'
 import type { CartItem } from '../lib/cart'
+import { useMarketData } from '../context/MarketDataContext'
 
 export const Route = createFileRoute('/cart')({ component: CartPage })
 
@@ -48,8 +49,8 @@ function itemKey(
 
 function CartPage() {
   const navigate = useNavigate()
+  const { products } = useMarketData()
   const convexApi = api as any
-  const products = useQuery(convexApi.market.listProducts)
   const startCheckout = useMutation(convexApi.commerce.startCheckout)
   const updateCartItemQuantity = useMutation(
     convexApi.market.updateCartItemQuantity,

@@ -95,7 +95,13 @@ async function findCartItem(
 export const listProducts = query({
   args: {},
   handler: async (ctx) => {
-    const products = await ctx.db.query('marketProducts').order('desc').take(50)
+    // Use the index to avoid a table scan — only reads matching rows.
+    // Products are ordered by _creationTime desc within the index.
+    const products = await ctx.db
+      .query('marketProducts')
+      .withIndex('by_inStock', (q) => q.eq('inStock', true))
+      .order('desc')
+      .take(50)
     return products.map(productForSale)
   },
 })

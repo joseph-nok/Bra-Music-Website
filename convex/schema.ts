@@ -83,7 +83,8 @@ export default defineSchema({
   })
     .index('by_productLine_and_name', ['productLine', 'name'])
     .index('by_inStock', ['inStock'])
-    .index('by_productLine', ['productLine']),
+    .index('by_productLine', ['productLine'])
+    .index('by_productLine_and_inStock', ['productLine', 'inStock']),
 
   carts: defineTable({
     status: v.union(v.literal('active'), v.literal('converted')),
