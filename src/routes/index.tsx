@@ -1,15 +1,39 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { useQuery } from 'convex/react'
+import { useQuery } from '@tanstack/react-query'
+import { convexQuery } from '@convex-dev/react-query'
 import { CalendarDays, MapPin, Play } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import { getCountdownParts } from '../lib/countdown'
 
-export const Route = createFileRoute('/')({ component: HomePage })
+export const Route = createFileRoute('/')({
+  loader: async ({ context }) => {
+    await Promise.all([
+      context.queryClient.ensureQueryData(
+        convexQuery(api.events.getUpcomingEvent, {}),
+      ),
+      context.queryClient.ensureQueryData(
+        convexQuery(api.content.getHomepageContent, {}),
+      ),
+    ])
+  },
+  component: HomePage,
+})
 
 function HomePage() {
-  const upcomingEvent = useQuery(api.events.getUpcomingEvent)
-  const homepageContent = useQuery(api.content.getHomepageContent)
+  const { data: upcomingEvent } = useQuery(
+    convexQuery(api.events.getUpcomingEvent, {}),
+  )
+  const { data: homepageContentList } = useQuery(
+    convexQuery(api.content.getHomepageContent, {}),
+  )
+
+  const homepageContent = homepageContentList
+    ? homepageContentList.reduce<Record<string, any>>((acc, item) => {
+        acc[item.key] = item.value
+        return acc
+      }, {})
+    : undefined
 
   const targetDate = upcomingEvent
     ? new Date(upcomingEvent.dateIso)
@@ -66,7 +90,7 @@ function HomePage() {
               </div>
             </div>
 
-            <Link to="/about" className="event-card__link">
+            <Link to="/about" className="event-card__link" preload="intent">
               Read More
             </Link>
           </div>
@@ -75,6 +99,7 @@ function HomePage() {
             <Link
               to="/music"
               className="homepage-button homepage-button--primary"
+              preload="intent"
             >
               Listen Now
               <Play size={14} fill="currentColor" strokeWidth={2.2} />
@@ -82,6 +107,7 @@ function HomePage() {
             <Link
               to="/invite-us"
               className="homepage-button homepage-button--ghost"
+              preload="intent"
             >
               Invite Us
             </Link>

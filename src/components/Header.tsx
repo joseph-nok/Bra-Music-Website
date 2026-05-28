@@ -49,7 +49,7 @@ export default function Header() {
   return (
     <header ref={headerRef} className="site-header px-4">
       <nav className="page-wrap site-header__nav">
-        <Link to="/" className="brand-mark no-underline">
+        <Link to="/" className="brand-mark no-underline" preload="intent">
           Baah Prosper Music
         </Link>
 
@@ -64,6 +64,7 @@ export default function Header() {
               to={item.to}
               className="nav-link"
               activeProps={{ className: 'nav-link is-active' }}
+              preload="intent"
             >
               {item.label}
             </Link>
@@ -75,6 +76,7 @@ export default function Header() {
             to="/cart"
             className="site-header__icon touch-target-48 relative"
             aria-label="Cart"
+            preload="intent"
           >
             <ShoppingCart size={16} strokeWidth={2} />
             {cartCount > 0 ? (
@@ -115,6 +117,7 @@ export default function Header() {
                   className: 'site-header__mobile-link is-active',
                 }}
                 onClick={() => setMenuOpen(false)}
+                preload="intent"
               >
                 {item.label}
               </Link>

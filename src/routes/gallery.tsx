@@ -30,10 +30,29 @@ export function GalleryPage() {
 
   if (isPending || albums === undefined) {
     return (
-      <main className="px-4 pb-20 pt-14 min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-(--color-copy-muted) font-display text-xl uppercase tracking-widest">
-          Loading Gallery...
-        </div>
+      <main className="px-4 pb-20 pt-14 min-h-screen">
+        <section className="page-wrap animate-pulse">
+          <div className="h-4 w-32 bg-white/10 rounded-full mb-3" />
+          <div className="h-16 w-3/4 bg-white/10 rounded-2xl mb-6" />
+          <div className="h-6 w-2/3 bg-white/10 rounded-lg mb-10" />
+
+          <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-12">
+            {[1, 2, 3, 4].map((i, index) => (
+              <div
+                key={i}
+                className={`bg-white/2 rounded-3xl border border-white/5 p-1 ${
+                  index % 4 === 0
+                    ? 'md:col-span-8 h-[320px] md:h-[560px]'
+                    : index % 4 === 1
+                      ? 'md:col-span-4 h-[320px] md:h-[560px]'
+                      : 'md:col-span-6 h-[320px] md:h-[360px]'
+                }`}
+              >
+                <div className="w-full h-full bg-white/10 rounded-2xl" />
+              </div>
+            ))}
+          </div>
+        </section>
       </main>
     )
   }

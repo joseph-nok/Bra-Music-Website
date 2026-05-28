@@ -1,23 +1,55 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery } from 'convex/react'
+import { useQuery } from '@tanstack/react-query'
+import { convexQuery } from '@convex-dev/react-query'
 import { Instagram } from 'lucide-react'
 import { api } from '../../convex/_generated/api'
-import { teamMembers as fallbackTeamMembers } from '../lib/site-content'
-
-export const Route = createFileRoute('/about')({ component: AboutPage })
+export const Route = createFileRoute('/about')({
+  loader: async ({ context }) => {
+    await context.queryClient.ensureQueryData(
+      convexQuery(api.content.listTeamMembers, {}),
+    )
+  },
+  component: AboutPage,
+})
 
 function AboutPage() {
-  const teamMembers = useQuery(api.content.listTeamMembers)
+  const { data: teamMembers } = useQuery(
+    convexQuery(api.content.listTeamMembers, {}),
+  )
 
   if (!teamMembers) {
     return (
-      <main className="px-4 pb-20 pt-14 flex items-center justify-center min-h-[60vh]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-(--color-accent) border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-(--color-copy-soft) animate-pulse">
-            Gathering the ministry team...
-          </p>
-        </div>
+      <main className="px-4 pb-20 pt-14">
+        <section className="page-wrap animate-pulse">
+          <div className="grid gap-10 lg:grid-cols-[1fr_0.9fr] lg:items-center mb-20">
+            <div>
+              <div className="h-4 w-32 bg-white/10 rounded-full mb-3" />
+              <div className="h-16 w-3/4 bg-white/10 rounded-2xl mb-6" />
+              <div className="h-6 w-2/3 bg-white/10 rounded-lg" />
+            </div>
+            <div className="editorial-card h-[600px] w-full bg-white/3 border border-white/5 rounded-2xl" />
+          </div>
+
+          <div className="pt-20">
+            <div className="h-4 w-32 bg-white/10 rounded-full mb-3" />
+            <div className="h-10 w-1/2 bg-white/10 rounded-xl mb-10" />
+            <div className="grid gap-8 lg:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="editorial-card overflow-hidden rounded-2xl border border-white/5 bg-white/2">
+                  <div className="h-80 w-full bg-white/10" />
+                  <div className="p-7 space-y-4">
+                    <div className="h-3 w-1/4 bg-white/10 rounded-full" />
+                    <div className="h-6 w-1/2 bg-white/10 rounded-lg" />
+                    <div className="space-y-2">
+                      <div className="h-4 w-full bg-white/10 rounded-full" />
+                      <div className="h-4 w-5/6 bg-white/10 rounded-full" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
       </main>
     )
   }

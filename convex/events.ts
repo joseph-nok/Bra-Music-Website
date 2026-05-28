@@ -37,15 +37,13 @@ export const getNextPublishedEvent = query({
   args: {},
   handler: async (ctx) => {
     const nowIso = new Date().toISOString()
-    const events = await ctx.db
+    return await ctx.db
       .query('events')
-      .withIndex('by_dateIso')
+      .withIndex('by_isPublished_and_dateIso', (q) =>
+        q.eq('isPublished', true).gte('dateIso', nowIso),
+      )
       .order('asc')
-      .take(200)
-    for (const event of events) {
-      if (event.isPublished && event.dateIso >= nowIso) return event
-    }
-    return null
+      .first()
   },
 })
 export const getUpcomingEvent = query({
@@ -81,14 +79,10 @@ export const syncUpcomingEvent = mutation({
     const nowIso = new Date().toISOString()
     const nextEvent = await ctx.db
       .query('events')
-      .withIndex('by_dateIso')
-      .order('asc')
-      .filter((q) =>
-        q.and(
-          q.eq(q.field('isPublished'), true),
-          q.gte(q.field('dateIso'), nowIso),
-        ),
+      .withIndex('by_isPublished_and_dateIso', (q) =>
+        q.eq('isPublished', true).gte('dateIso', nowIso),
       )
+      .order('asc')
       .first()
 
     if (!nextEvent) {

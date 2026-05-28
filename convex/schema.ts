@@ -34,7 +34,8 @@ export default defineSchema({
     isPublished: v.boolean(),
   })
     .index('by_isPublished', ['isPublished'])
-    .index('by_dateIso', ['dateIso']),
+    .index('by_dateIso', ['dateIso'])
+    .index('by_isPublished_and_dateIso', ['isPublished', 'dateIso']),
 
   galleryAibums: defineTable({
     category: v.string(), // Renamed from title

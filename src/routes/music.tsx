@@ -1,12 +1,51 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery } from 'convex/react'
+import { useQuery } from '@tanstack/react-query'
+import { convexQuery } from '@convex-dev/react-query'
 import { useState } from 'react'
 import { api } from '../../convex/_generated/api'
 
-export const Route = createFileRoute('/music')({ component: MusicPage })
+export const Route = createFileRoute('/music')({
+  loader: async ({ context }) => {
+    await context.queryClient.ensureQueryData(
+      convexQuery(api.content.listMusicReleases, {}),
+    )
+  },
+  component: MusicPage,
+})
 
 function MusicPage() {
-  const releases = useQuery(api.content.listMusicReleases)
+  const { data: releases } = useQuery(
+    convexQuery(api.content.listMusicReleases, {}),
+  )
+  if (releases === undefined) {
+    return (
+      <main className="px-4 pb-20 pt-14">
+        <section className="page-wrap animate-pulse">
+          <div className="section-heading mb-12">
+            <div>
+              <div className="h-4 w-32 bg-white/10 rounded-full mb-3" />
+              <div className="h-14 w-1/2 bg-white/10 rounded-xl" />
+            </div>
+            <div className="h-6 w-1/3 bg-white/10 rounded-lg mt-4" />
+          </div>
+
+          <div className="grid gap-8 lg:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="editorial-card overflow-hidden rounded-2xl border border-white/5 bg-white/2">
+                <div className="aspect-video w-full bg-white/10" />
+                <div className="p-6 space-y-4">
+                  <div className="h-6 w-3/4 bg-white/10 rounded-lg" />
+                  <div className="h-4 w-1/4 bg-white/10 rounded-full" />
+                  <div className="h-8 w-full bg-white/10 rounded-lg mt-6" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </main>
+    )
+  }
+
   const musicCards = releases ?? []
 
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({})

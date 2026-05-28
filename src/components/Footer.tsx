@@ -43,6 +43,7 @@ export default function Footer() {
                 key={item.to}
                 to={item.to}
                 className="site-footer__nav-link"
+                preload="intent"
               >
                 {item.label}
               </Link>

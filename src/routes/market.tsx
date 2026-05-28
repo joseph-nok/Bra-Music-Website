@@ -91,7 +91,7 @@ function MarketSkeleton() {
           {[0, 1].map((i) => (
             <article
               key={i}
-              className="overflow-hidden rounded-2xl flex flex-col border border-white/5 bg-white/[0.02] backdrop-blur-md"
+              className="overflow-hidden rounded-2xl flex flex-col border border-white/5 bg-white/2 backdrop-blur-md"
             >
               {/* Image area */}
               <div
@@ -199,7 +199,7 @@ function MarketPage() {
               GHS {total.toFixed(2)}
             </span>
           </div>
-          <Link to="/cart" className="cta-primary">
+          <Link to="/cart" className="cta-primary" preload="intent">
             Go To Cart
           </Link>
         </div>
@@ -378,14 +378,14 @@ function MerchProductCard({
   }
 
   return (
-    <article className="editorial-card overflow-hidden rounded-2xl flex flex-col h-full border border-white/5 bg-white/[0.02] backdrop-blur-md shadow-2xl transition-all duration-300 hover:border-white/10 hover:shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+    <article className="editorial-card overflow-hidden rounded-2xl flex flex-col h-full border border-white/5 bg-white/2 backdrop-blur-md shadow-2xl transition-all duration-300 hover:border-white/10 hover:shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
       {/* Sliding image carousel — fixed height, flush to card edges */}
       <div
         className="relative overflow-hidden bg-white/5"
         style={{ aspectRatio: '4/3', overflow: 'hidden' }}
       >
         <div
-          className="flex transition-transform duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]"
+          className="flex transition-transform duration-500 ease-in-out"
           style={{
             width: `${colors.length * 100}%`,
             height: '100%',
@@ -413,7 +413,7 @@ function MerchProductCard({
         </div>
       </div>
 
-      <div className="p-6 flex flex-col flex-grow">
+      <div className="p-6 flex flex-col grow">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-(--color-copy-muted)">
@@ -448,10 +448,10 @@ function MerchProductCard({
           </span>
         </p>
 
-        <div className="mt-4 flex flex-col gap-4 flex-grow">
+        <div className="mt-4 flex flex-col gap-4 grow">
           {/* Color Selector */}
           <div>
-            <span className="text-xs font-bold uppercase tracking-[0.1em] text-(--color-copy-muted) block mb-2">
+            <span className="text-xs font-bold uppercase tracking-widest text-(--color-copy-muted) block mb-2">
               Color
             </span>
             <div className="flex flex-wrap items-center gap-3">
@@ -489,7 +489,7 @@ function MerchProductCard({
 
           {/* Size Selector */}
           <div>
-            <span className="text-xs font-bold uppercase tracking-[0.1em] text-(--color-copy-muted) block mb-2">
+            <span className="text-xs font-bold uppercase tracking-widest text-(--color-copy-muted) block mb-2">
               Size
             </span>
             <div className="flex flex-wrap gap-2">
@@ -684,7 +684,7 @@ function StandardProductCard({
   }
 
   return (
-    <article className="editorial-card overflow-hidden rounded-2xl flex flex-col h-full border border-white/5 bg-white/[0.02] backdrop-blur-md shadow-2xl transition-all duration-300 hover:border-white/10 hover:shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+    <article className="editorial-card overflow-hidden rounded-2xl flex flex-col h-full border border-white/5 bg-white/2 backdrop-blur-md shadow-2xl transition-all duration-300 hover:border-white/10 hover:shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
       <div style={{ aspectRatio: '4/3', overflow: 'hidden' }}>
         <img
           key={displayImage}
@@ -701,7 +701,7 @@ function StandardProductCard({
           className="hover:scale-105"
         />
       </div>
-      <div className="p-6 flex flex-col flex-grow">
+      <div className="p-6 flex flex-col grow">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-(--color-copy-muted)">
@@ -735,7 +735,7 @@ function StandardProductCard({
             {product.stockQuantity}
           </span>
         </p>
-        <div className="mt-4 flex flex-col gap-4 flex-grow">
+        <div className="mt-4 flex flex-col gap-4 grow">
           <label className="field-shell">
             <span className="field-label">Color</span>
             <select
