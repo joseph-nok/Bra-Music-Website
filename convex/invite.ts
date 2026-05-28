@@ -85,16 +85,16 @@ export const sendInviteEmail = action({
       </div>
     `
 
-    const response = await fetch('https://resend.com', {
+    const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${resendApiKey}`,
       },
       body: JSON.stringify({
-        from: `Bra Music Invites <${fromEmail}>`,
+        from: 'onboarding@resend.dev',
         to: 'josephnok088@gmail.com', // Sends safely to your verified account
-        reply_to: args.email,         // Captures the user's email so you can reply instantly
+        reply_to: args.email, // Captures the user's email so you can reply instantly
         subject: `Invite: ${args.name}`,
         html: notificationHtml,
       }),
@@ -102,8 +102,11 @@ export const sendInviteEmail = action({
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('Resend Error:', errorText)
-      return { success: false, error: errorText }
+      console.error(
+        `Resend Error [HTTP ${response.status}]: ${errorText}`,
+        '\n→ Check that RESEND_API_KEY is set on your PRODUCTION deployment in the Convex Dashboard (ideal-swan-429)',
+      )
+      return { success: false, error: `[${response.status}] ${errorText}` }
     }
 
     return { success: true }
@@ -123,7 +126,7 @@ export const sendOfficialResponse = action({
 
     const fromEmail = await getSenderEmail(ctx)
 
-    const response = await fetch('https://resend.com', {
+    const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -140,8 +143,11 @@ export const sendOfficialResponse = action({
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('Resend Official Response Error:', errorText)
-      return { success: false, error: errorText }
+      console.error(
+        `Resend Official Response Error [HTTP ${response.status}]: ${errorText}`,
+        '\n→ Check that RESEND_API_KEY is set on your PRODUCTION deployment in the Convex Dashboard (ideal-swan-429)',
+      )
+      return { success: false, error: `[${response.status}] ${errorText}` }
     }
 
     return { success: true }

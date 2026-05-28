@@ -5,7 +5,15 @@ import type { MutationCtx } from './_generated/server'
 import { MAX_CART_QUANTITY, productForSale } from './marketStock'
 
 const productLine = v.union(v.literal('merch'), v.literal('cap'))
-const color = v.union(v.literal('Black'), v.literal('White'))
+const color = v.union(
+  v.literal('Black'),
+  v.literal('White'),
+  v.literal('black'),
+  v.literal('red'),
+  v.literal('white'),
+  v.literal('yellow'),
+  v.literal('blue'),
+)
 const size = v.union(
   v.literal('M'),
   v.literal('L'),
@@ -23,7 +31,7 @@ const orderLineValidator = v.object({
 })
 
 type ProductLine = 'merch' | 'cap'
-type ProductColor = 'Black' | 'White'
+type ProductColor = 'Black' | 'White' | 'black' | 'red' | 'white' | 'yellow' | 'blue'
 type ProductSize = 'M' | 'L' | 'XL' | 'XXL' | 'XXXL'
 
 function requireNonEmptyField(label: string, value: string) {
@@ -236,7 +244,7 @@ export const addCartItem = mutation({
       marketProductId: product._id,
       productName: product.name,
       productImage: product.image,
-      currency: product.currency,
+      currency: product.currency ?? 'GHS',
       quantity: nextQuantity,
       color: args.color,
       size: args.size,
@@ -361,7 +369,7 @@ export const createOrder = mutation({
         productLine: product.productLine,
         productName: product.name,
         productImage: product.image,
-        currency: product.currency,
+        currency: product.currency ?? 'GHS',
         unitPrice: product.price,
         lineTotal,
       })

@@ -11,7 +11,15 @@ const sizeValidator = v.union(
   v.literal('XXL'),
   v.literal('XXXL'),
 )
-const colorValidator = v.union(v.literal('Black'), v.literal('White'))
+const colorValidator = v.union(
+  v.literal('Black'),
+  v.literal('White'),
+  v.literal('black'),
+  v.literal('red'),
+  v.literal('white'),
+  v.literal('yellow'),
+  v.literal('blue'),
+)
 
 const checkoutLineValidator = v.object({
   productLine: productLineValidator,
@@ -68,7 +76,7 @@ export const startCheckout = mutation({
       productImage: string
       currency: string
       quantity: number
-      color: 'Black' | 'White'
+      color: 'Black' | 'White' | 'black' | 'red' | 'white' | 'yellow' | 'blue'
       size: 'M' | 'L' | 'XL' | 'XXL' | 'XXXL'
       unitPrice: number
       lineTotal: number

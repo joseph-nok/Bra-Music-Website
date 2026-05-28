@@ -11,7 +11,7 @@ export type CartItem = {
   currency: string
   price: number
   quantity: number
-  color: 'Black' | 'White'
+  color: 'Black' | 'White' | 'black' | 'red' | 'white' | 'yellow' | 'blue'
   size: 'M' | 'L' | 'XL' | 'XXL' | 'XXXL'
 }
 

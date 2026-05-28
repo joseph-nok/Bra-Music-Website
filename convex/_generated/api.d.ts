@@ -17,6 +17,7 @@ import type * as invite from "../invite.js";
 import type * as inviteEmail from "../inviteEmail.js";
 import type * as market from "../market.js";
 import type * as marketStock from "../marketStock.js";
+import type * as merch from "../merch.js";
 import type * as music from "../music.js";
 import type * as seed from "../seed.js";
 import type * as setfooter from "../setfooter.js";
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   inviteEmail: typeof inviteEmail;
   market: typeof market;
   marketStock: typeof marketStock;
+  merch: typeof merch;
   music: typeof music;
   seed: typeof seed;
   setfooter: typeof setfooter;

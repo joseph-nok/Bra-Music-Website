@@ -97,7 +97,15 @@ export default defineSchema({
     productImage: v.string(),
     currency: v.string(),
     quantity: v.number(),
-    color: v.union(v.literal('Black'), v.literal('White')),
+    color: v.union(
+      v.literal('Black'),
+      v.literal('White'),
+      v.literal('black'),
+      v.literal('red'),
+      v.literal('white'),
+      v.literal('yellow'),
+      v.literal('blue'),
+    ),
     size: v.union(
       v.literal('M'),
       v.literal('L'),
@@ -145,7 +153,15 @@ export default defineSchema({
     productImage: v.string(),
     currency: v.string(),
     quantity: v.number(),
-    color: v.union(v.literal('Black'), v.literal('White')),
+    color: v.union(
+      v.literal('Black'),
+      v.literal('White'),
+      v.literal('black'),
+      v.literal('red'),
+      v.literal('white'),
+      v.literal('yellow'),
+      v.literal('blue'),
+    ),
     size: v.union(
       v.literal('M'),
       v.literal('L'),
@@ -163,4 +179,52 @@ export default defineSchema({
     instagram: v.optional(v.string()),
     tiktok: v.optional(v.string()),
   }),
+
+  merchOrders: defineTable({
+    customerName: v.string(),
+    email: v.string(),
+    phone: v.optional(v.string()),
+    address: v.string(),
+    totalAmount: v.number(),
+  }).index('by_email', ['email']),
+
+  merchOrderItems: defineTable({
+    orderId: v.id('merchOrders'),
+    productLine: v.union(v.literal('merch'), v.literal('cap')),
+    marketProductId: v.id('marketProducts'),
+    productName: v.string(),
+    productImage: v.string(),
+    currency: v.string(),
+    quantity: v.number(),
+    color: v.union(
+      v.literal('Black'),
+      v.literal('White'),
+      v.literal('black'),
+      v.literal('red'),
+      v.literal('white'),
+      v.literal('yellow'),
+      v.literal('blue'),
+    ),
+    size: v.union(
+      v.literal('M'),
+      v.literal('L'),
+      v.literal('XL'),
+      v.literal('XXL'),
+      v.literal('XXXL'),
+    ),
+    unitPrice: v.number(),
+    lineTotal: v.number(),
+  }).index('by_orderId', ['orderId']),
+
+  // Per-product, per-color images stored in Convex File Storage.
+  // colorName is free-form (e.g. "Black", "White", "Red", "Blue", "Yellow")
+  // so new colors can be added without a schema change.
+  merchColorImages: defineTable({
+    productId: v.id('marketProducts'),
+    colorName: v.string(),   // display name, e.g. "Black"
+    storageId: v.id('_storage'),
+    url: v.string(),          // cached public URL from ctx.storage.getUrl()
+  })
+    .index('by_product', ['productId'])
+    .index('by_product_and_color', ['productId', 'colorName']),
 })
