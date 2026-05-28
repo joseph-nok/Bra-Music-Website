@@ -1,7 +1,7 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery } from 'convex/react'
 import { Check, Minus, Plus, ShoppingCart } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 import {
@@ -186,7 +186,13 @@ function MarketPage() {
           </p>
         ) : null}
 
-        <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div
+          className={`mt-10 grid gap-6 ${
+            productList.length === 1
+              ? 'grid-cols-1 max-w-md mx-auto justify-center'
+              : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+          }`}
+        >
           {productList.map((product) => {
             if (product.productLine === 'merch') {
               return (
@@ -281,37 +287,42 @@ function SlideshowProductCard({
 
   const [currentColor, setCurrentColor] = useState<ColorOption>('black')
   const [isAutoPlaying, setIsAutoPlaying] = useState(true)
+  const [blinkCount, setBlinkCount] = useState(0)
   const [selectedSize, setSelectedSize] = useState<
     'M' | 'L' | 'XL' | 'XXL' | 'XXXL'
   >('M')
   const [quantity, setQuantity] = useState(1)
 
-  const intervalRef = useRef<any>(null)
-
-  // Slideshow interval logic
+  // Slideshow interval and rapid blink logic
   useEffect(() => {
-    if (isAutoPlaying) {
-      intervalRef.current = setInterval(() => {
+    if (!isAutoPlaying) return
+
+    if (blinkCount < 5) {
+      const timer = setTimeout(() => {
+        setCurrentColor((prev) => {
+          const currentIndex = colors.indexOf(prev)
+          const nextIndex = (currentIndex + 1) % colors.length
+          return colors[nextIndex]
+        })
+        setBlinkCount((prev) => prev + 1)
+      }, 200)
+      return () => clearTimeout(timer)
+    } else {
+      const timer = setInterval(() => {
         setCurrentColor((prev) => {
           const currentIndex = colors.indexOf(prev)
           const nextIndex = (currentIndex + 1) % colors.length
           return colors[nextIndex]
         })
       }, 3000)
+      return () => clearInterval(timer)
     }
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-      }
-    }
-  }, [isAutoPlaying])
+  }, [isAutoPlaying, blinkCount])
 
   // Handle manual color selection
   const handleColorSelect = (color: ColorOption) => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-    }
     setIsAutoPlaying(false)
+    setBlinkCount(5) // Skip blinking when manually selecting
     setCurrentColor(color)
   }
 
@@ -379,18 +390,27 @@ function SlideshowProductCard({
 
   return (
     <article className="editorial-card overflow-hidden rounded-2xl flex flex-col h-full border border-white/5 bg-white/[0.02] backdrop-blur-md shadow-2xl transition-all duration-300 hover:border-white/10 hover:shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
-      <div className="relative aspect-square w-full overflow-hidden bg-white/5">
+      <div className="relative aspect-square w-full overflow-hidden bg-white/5 flex items-center justify-center">
         <img
           key={imagePath}
           src={imagePath}
           alt={`${product.name} – ${currentColor}`}
-          className="absolute inset-0 h-full w-full object-cover transition-all duration-500 transform hover:scale-105"
+          className="h-full w-full object-contain object-center transition-all duration-500 transform hover:scale-105 p-4"
         />
         {/* Play/Pause overlay badge in the corner */}
         <div className="absolute top-4 right-4 z-10">
           <button
             type="button"
-            onClick={() => setIsAutoPlaying((prev) => !prev)}
+            onClick={() => {
+              setIsAutoPlaying((prev) => {
+                const next = !prev
+                if (next) {
+                  // If resuming, skip the intro blink count
+                  setBlinkCount(5)
+                }
+                return next
+              })
+            }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-xs font-semibold text-white/85 hover:text-white hover:bg-black/80 transition-all duration-200"
           >
             <span
@@ -689,12 +709,12 @@ function StandardProductCard({
 
   return (
     <article className="editorial-card overflow-hidden rounded-2xl flex flex-col h-full border border-white/5 bg-white/[0.02] backdrop-blur-md shadow-2xl transition-all duration-300 hover:border-white/10 hover:shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
-      <div className="relative aspect-square w-full overflow-hidden bg-white/5">
+      <div className="relative aspect-square w-full overflow-hidden bg-white/5 flex items-center justify-center">
         <img
           key={displayImage}
           src={displayImage}
           alt={`${product.name} – ${selectedVariant.color}`}
-          className="absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
+          className="h-full w-full object-contain object-center transition-all duration-500 transform hover:scale-105 p-4"
           style={{ opacity: 1 }}
         />
       </div>
