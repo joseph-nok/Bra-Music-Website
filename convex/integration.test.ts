@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { convexTest } from 'convex-test'
 import { describe, expect, it } from 'vitest'
-import { api } from './_generated/api'
+import { api, internal } from './_generated/api'
 import schema from './schema'
 
 const modules = import.meta.glob('./**/*.ts')
@@ -150,6 +150,64 @@ describe('Convex backend integration', () => {
       checkoutId: checkout.checkoutId,
     })
     expect(paid.status).toBe('paid')
+  })
+
+  it('formats checkout order details by product, size, color, and quantity', async () => {
+    const t = convexTest(schema, modules)
+    const productId = await t.mutation(api.market.addProduct, {
+      productLine: 'merch',
+      name: 'Ministry Shirt',
+      category: 'Merch',
+      description: 'Event shirt',
+      image: 'https://example.com/shirt.jpg',
+      price: 85,
+      stockQuantity: 20,
+    })
+
+    const checkout = await t.mutation(api.commerce.startCheckout, {
+      items: [
+        {
+          productLine: 'merch',
+          productId,
+          quantity: 3,
+          color: 'red',
+          size: 'M',
+        },
+        {
+          productLine: 'merch',
+          productId,
+          quantity: 1,
+          color: 'black',
+          size: 'XL',
+        },
+        {
+          productLine: 'merch',
+          productId,
+          quantity: 2,
+          color: 'blue',
+          size: 'M',
+        },
+      ],
+      email: 'buyer@example.com',
+      momoNumber: '0241234567',
+      shippingAddress: {
+        country: 'Ghana',
+        firstName: 'Buyer',
+        lastName: 'Test',
+        phone: '0241234567',
+        addressLine1: '12 High Street',
+        region: 'Bono',
+        city: 'Sunyani',
+      },
+    })
+
+    const orderEmailData = await t.query(internal.commerce.getOrderEmailData, {
+      checkoutId: checkout.checkoutId,
+    })
+
+    expect(orderEmailData.orderItemsBreakdown).toBe(
+      ['Ministry Shirt', 'M: red 3', 'XL: black 1', 'M: blue 2'].join('\n'),
+    )
   })
 
   it('invite list and add', async () => {

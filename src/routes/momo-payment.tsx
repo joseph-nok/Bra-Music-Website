@@ -18,6 +18,38 @@ export const Route = createFileRoute('/momo-payment')({
 
 const PaystackCheckout = React.lazy(() => import('../components/PaystackCheckout'))
 
+type CheckoutItemSummary = {
+  productName: string
+  quantity: number
+  color: string
+  size: string
+}
+
+function formatOrderItemsBreakdown(items: CheckoutItemSummary[] = []) {
+  if (!items.length) return 'N/A'
+
+  const productGroups = new Map<string, Map<string, number>>()
+
+  for (const item of items) {
+    const productName = item.productName.trim() || 'Merch'
+    const variantLabel = `${item.size.trim()}: ${item.color.trim()}`
+    const variants = productGroups.get(productName) ?? new Map<string, number>()
+    variants.set(variantLabel, (variants.get(variantLabel) ?? 0) + item.quantity)
+    productGroups.set(productName, variants)
+  }
+
+  return [...productGroups]
+    .map(([productName, variants]) =>
+      [
+        productName,
+        ...[...variants].map(
+          ([variantLabel, quantity]) => `${variantLabel} ${quantity}`,
+        ),
+      ].join('\n'),
+    )
+    .join('\n\n')
+}
+
 function MoMoPaymentPage() {
   const navigate = useNavigate()
   const convexApi = api as any
@@ -101,21 +133,7 @@ function MoMoPaymentPage() {
   ]
     .filter(Boolean)
     .join('\n')
-  const orderItemsBreakdown = checkout.items?.length
-    ? checkout.items
-        .map(
-          (item: {
-            quantity: number
-            productName: string
-            color: string
-            size: string
-            currency: string
-            lineTotal: number
-          }) =>
-            `${item.quantity}x ${item.productName} - ${item.color}, ${item.size} - ${item.currency} ${item.lineTotal.toFixed(2)}`,
-        )
-        .join('\n')
-    : 'N/A'
+  const orderItemsBreakdown = formatOrderItemsBreakdown(checkout.items)
   const phoneNumber = checkout.shippingAddress.phone || checkout.momoNumber
 
   const paystackConfig = {

@@ -49,6 +49,13 @@ type OrderEmailData = {
   orderNotificationEmailSentAt: number | null
 }
 
+type OrderItemSummary = {
+  productName: string
+  quantity: number
+  color: string
+  size: string
+}
+
 function normalizeQuantity(quantity: number) {
   if (!Number.isFinite(quantity)) {
     throw new Error('Quantity must be a finite number.')
@@ -70,6 +77,33 @@ function escapeHtml(value: string) {
 function formatGhsAmount(amount: number) {
   if (!Number.isFinite(amount)) return '0.00'
   return amount.toFixed(2)
+}
+
+function formatOrderItemsBreakdown(items: OrderItemSummary[]) {
+  if (!items.length) return 'N/A'
+
+  const productGroups = new Map<string, Map<string, number>>()
+
+  for (const item of items) {
+    const productName = item.productName.trim() || 'Merch'
+    const size = item.size.trim()
+    const color = item.color.trim()
+    const variantLabel = `${size}: ${color}`
+    const variants = productGroups.get(productName) ?? new Map<string, number>()
+    variants.set(variantLabel, (variants.get(variantLabel) ?? 0) + item.quantity)
+    productGroups.set(productName, variants)
+  }
+
+  return [...productGroups]
+    .map(([productName, variants]) =>
+      [
+        productName,
+        ...[...variants].map(([variantLabel, quantity]) => {
+          return `${variantLabel} ${quantity}`
+        }),
+      ].join('\n'),
+    )
+    .join('\n\n')
 }
 
 function buildOrderEmailHtml({
@@ -405,12 +439,7 @@ export const getOrderEmailData = internalQuery({
       .join('\n')
 
     const orderItemsBreakdown = items.length
-      ? items
-          .map(
-            (item) =>
-              `${item.quantity}x ${item.productName} - ${item.color}, ${item.size} - ${item.currency} ${formatGhsAmount(item.lineTotal)}`,
-          )
-          .join('\n')
+      ? formatOrderItemsBreakdown(items)
       : 'N/A'
 
     return {

@@ -12,6 +12,7 @@ declare const process: {
 // ==========================================
 export interface CartItem {
   name: string
+  color?: string
   size: string
   quantity: number
 }
@@ -48,8 +49,9 @@ const exampleCheckout: CheckoutInput = {
   city: 'Ho',
   region: 'Upper East',
   cart: [
-    { name: 'Merch', size: 'M', quantity: 3 },
-    { name: 'Merch', size: 'XL', quantity: 4 },
+    { name: 'Merch', color: 'red', size: 'M', quantity: 3 },
+    { name: 'Merch', color: 'black', size: 'XL', quantity: 1 },
+    { name: 'Merch', color: 'blue', size: 'M', quantity: 2 },
   ],
 }
 
@@ -85,6 +87,32 @@ function validateCheckoutInput(data: CheckoutInput) {
   }
 }
 
+function formatCartItemsBreakdown(cart: CartItem[]) {
+  if (!cart.length) return 'N/A'
+
+  const productGroups = new Map<string, Map<string, number>>()
+
+  for (const item of cart) {
+    const productName = item.name.trim() || 'Merch'
+    const color = item.color?.trim() || 'Color not specified'
+    const variantLabel = `${item.size.trim()}: ${color}`
+    const variants = productGroups.get(productName) ?? new Map<string, number>()
+    variants.set(variantLabel, (variants.get(variantLabel) ?? 0) + item.quantity)
+    productGroups.set(productName, variants)
+  }
+
+  return [...productGroups]
+    .map(([productName, variants]) =>
+      [
+        productName,
+        ...[...variants].map(
+          ([variantLabel, quantity]) => `${variantLabel} ${quantity}`,
+        ),
+      ].join('\n'),
+    )
+    .join('\n\n')
+}
+
 // ==========================================
 // 2. SECURE SERVER FUNCTION WITH MARKDOWN
 // ==========================================
@@ -106,12 +134,7 @@ export const initializePayment = createServerFn({ method: 'POST' })
 * **Country:** Ghana
     `.trim()
 
-    const markdownCartSummary = `
-### 🛍️ Items Ordered
-${data.cart
-  .map((item) => `* **${item.quantity}x** ${item.name} — *Size: ${item.size}*`)
-  .join('\n')}
-    `.trim()
+    const markdownCartSummary = formatCartItemsBreakdown(data.cart)
 
     const amountInPesewas = Math.round(data.amountGhs * 100)
 
