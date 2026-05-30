@@ -136,6 +136,8 @@ export default defineSchema({
     momoNumber: v.string(),
     currency: v.string(),
     totalAmount: v.number(),
+    orderNotificationEmailSentAt: v.optional(v.number()),
+    orderNotificationEmailError: v.optional(v.string()),
     shippingAddress: v.object({
       country: v.string(),
       firstName: v.string(),
@@ -223,9 +225,9 @@ export default defineSchema({
   // so new colors can be added without a schema change.
   merchColorImages: defineTable({
     productId: v.id('marketProducts'),
-    colorName: v.string(),   // display name, e.g. "Black"
+    colorName: v.string(), // display name, e.g. "Black"
     storageId: v.id('_storage'),
-    url: v.string(),          // cached public URL from ctx.storage.getUrl()
+    url: v.string(), // cached public URL from ctx.storage.getUrl()
   })
     .index('by_product', ['productId'])
     .index('by_product_and_color', ['productId', 'colorName']),

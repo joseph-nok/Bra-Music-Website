@@ -4,9 +4,9 @@ import { api } from './_generated/api'
 import { officialResponseHtml } from './inviteEmail'
 
 // Helper function to look up your sender settings configuration
-async function getSenderEmail(
-  ctx: { runQuery: (query: any, args: { key: string }) => Promise<unknown> },
-) {
+async function getSenderEmail(ctx: {
+  runQuery: (query: any, args: { key: string }) => Promise<unknown>
+}) {
   const senderSetting = await ctx.runQuery(api.settings.getSetting, {
     key: 'sender_email',
   })
@@ -60,7 +60,9 @@ export const sendInviteEmail = action({
   handler: async (ctx, args) => {
     const resendApiKey = process.env.RESEND_API_KEY
     if (!resendApiKey) {
-      console.error('Email service error: RESEND_API_KEY is missing on the Convex Dashboard!')
+      console.error(
+        'Email service error: RESEND_API_KEY is missing on the Convex Dashboard!',
+      )
       return { success: false, error: 'Email service not configured' }
     }
 
@@ -92,7 +94,7 @@ export const sendInviteEmail = action({
         Authorization: `Bearer ${resendApiKey}`,
       },
       body: JSON.stringify({
-        from: 'onboarding@resend.dev',
+        from: `Baah Prosper Music <${fromEmail}>`,
         to: 'josephnok088@gmail.com', // Sends safely to your verified account
         reply_to: args.email, // Captures the user's email so you can reply instantly
         subject: `Invite: ${args.name}`,

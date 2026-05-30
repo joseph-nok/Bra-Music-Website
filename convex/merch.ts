@@ -1,6 +1,5 @@
 import { mutation, query } from './_generated/server'
 import { v } from 'convex/values'
-import type { Id } from './_generated/dataModel'
 
 /**
  * Generate a short-lived upload URL that the browser can POST a file to.
