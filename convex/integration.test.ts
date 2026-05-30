@@ -145,6 +145,9 @@ describe('Convex backend integration', () => {
       checkoutId: checkout.checkoutId,
     })
     expect(stored?.status).toBe('pending')
+    expect(stored?.orderItemsBreakdown).toBe(
+      '1x Ministry Cap - Color: Black, Size: L',
+    )
 
     const paid = await t.mutation(api.commerce.completeTestPayment, {
       checkoutId: checkout.checkoutId,

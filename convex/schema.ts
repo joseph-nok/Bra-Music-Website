@@ -136,6 +136,7 @@ export default defineSchema({
     momoNumber: v.string(),
     currency: v.string(),
     totalAmount: v.number(),
+    orderItemsBreakdown: v.optional(v.string()),
     orderNotificationEmailSentAt: v.optional(v.number()),
     orderNotificationEmailError: v.optional(v.string()),
     shippingAddress: v.object({

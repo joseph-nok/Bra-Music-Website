@@ -119,7 +119,8 @@ function MoMoPaymentPage() {
   ]
     .filter(Boolean)
     .join('\n')
-  const orderItemsBreakdown = formatOrderItemsBreakdown(checkout.items)
+  const orderItemsBreakdown =
+    checkout.orderItemsBreakdown || formatOrderItemsBreakdown(checkout.items)
   const phoneNumber = checkout.shippingAddress.phone || checkout.momoNumber
 
   const paystackConfig = {

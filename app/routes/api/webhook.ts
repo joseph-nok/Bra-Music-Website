@@ -39,6 +39,7 @@ type CheckoutForEmail = {
   momoNumber: string
   paymentReference: string
   totalAmount: number
+  orderItemsBreakdown?: string
   shippingAddress: {
     country: string
     firstName: string
@@ -334,7 +335,7 @@ export const POST = async ({ request }: { request: Request }) => {
           .join('\n')
       : getCustomFieldValue(metadata, 'delivery_info')
     const orderItemsBreakdown = checkout
-      ? formatCheckoutOrderItems(checkout.items)
+      ? checkout.orderItemsBreakdown || formatCheckoutOrderItems(checkout.items)
       : getCustomFieldValue(metadata, 'order_items_breakdown')
     const displayAmount = checkout
       ? formatCheckoutAmount(checkout.totalAmount)
