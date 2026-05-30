@@ -3,6 +3,12 @@ import { ConvexHttpClient } from 'convex/browser'
 import { Resend } from 'resend'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
+import {
+  paystackError,
+  paystackLog,
+  sanitizeForLog,
+  sanitizeHeaders,
+} from '../../../src/lib/paystack-debug'
 
 type PaystackCustomField = {
   variable_name?: unknown
@@ -180,19 +186,41 @@ const getConvexUrl = () =>
 
 const getCheckoutForEmail = async (
   checkoutId: Id<'checkouts'> | null,
+  reference: string,
 ): Promise<CheckoutForEmail | null> => {
   const convexUrl = getConvexUrl()
   if (!checkoutId || !convexUrl) {
+    paystackLog('PAYSTACK WEBHOOK', 'Skipping checkout lookup', {
+      reference,
+      checkoutId: checkoutId ?? undefined,
+      hasConvexUrl: Boolean(convexUrl),
+    })
     return null
   }
 
   try {
+    paystackLog('PAYSTACK WEBHOOK', 'Loading checkout from Convex', {
+      reference,
+      checkoutId,
+    })
     const convex = new ConvexHttpClient(convexUrl)
-    return (await convex.query(api.commerce.getCheckout, {
+    const checkout = (await convex.query(api.commerce.getCheckout, {
       checkoutId,
     })) as CheckoutForEmail | null
+    paystackLog('PAYSTACK WEBHOOK', 'Checkout lookup completed', {
+      reference,
+      checkoutId,
+      found: Boolean(checkout),
+      itemCount: checkout?.items?.length ?? 0,
+    })
+    return checkout
   } catch (error) {
-    console.error('Could not load checkout for order email:', error)
+    paystackError(
+      'PAYSTACK WEBHOOK',
+      'Could not load checkout for order email',
+      { reference, checkoutId },
+      error,
+    )
     return null
   }
 }
@@ -202,34 +230,59 @@ const fetchVerifiedTransaction = async (
 ): Promise<PaystackTransaction | null> => {
   const secretKey =
     process.env.PAYSTACK_SECRET_KEY || process.env.PAYSTACK_PRIVATE_KEY
+  const verifyUrl = `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`
 
   if (!secretKey) {
-    console.error('Paystack verify skipped: PAYSTACK_SECRET_KEY is not configured')
+    paystackError('PAYSTACK WEBHOOK', 'Paystack verify skipped: secret key missing', {
+      reference,
+    })
     return null
   }
 
+  paystackLog('PAYSTACK WEBHOOK', 'Fetching verified transaction from Paystack', {
+    reference,
+    verifyUrl,
+  })
+
   try {
-    const response = await fetch(
-      `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
-      {
-        headers: {
-          Authorization: `Bearer ${secretKey}`,
-        },
+    const response = await fetch(verifyUrl, {
+      headers: {
+        Authorization: `Bearer ${secretKey}`,
       },
-    )
+    })
     const data = (await response.json()) as PaystackVerifyResponse
 
+    paystackLog('PAYSTACK WEBHOOK', 'Paystack verify response received', {
+      reference,
+      httpStatus: response.status,
+      paystackStatus: data.status,
+      transactionStatus: data.data?.status,
+      hasMetadata: Boolean(data.data?.metadata),
+      responseBody: sanitizeForLog(data as Record<string, unknown>),
+    })
+
     if (!response.ok || !data.status || data.data?.status !== 'success') {
-      console.error(
-        'Paystack verify failed for webhook:',
-        data.message || response.status,
-      )
+      paystackError('PAYSTACK WEBHOOK', 'Paystack verify failed for webhook', {
+        reference,
+        httpStatus: response.status,
+        message: data.message,
+      })
       return null
     }
 
+    paystackLog('PAYSTACK WEBHOOK', 'Paystack verify succeeded', {
+      reference,
+      amount: data.data?.amount,
+      customerEmail: data.data?.customer?.email,
+    })
     return data.data ?? null
   } catch (error) {
-    console.error('Paystack verify request failed:', error)
+    paystackError(
+      'PAYSTACK WEBHOOK',
+      'Paystack verify request failed',
+      { reference },
+      error,
+    )
     return null
   }
 }
@@ -237,10 +290,16 @@ const fetchVerifiedTransaction = async (
 const verifyPaystackSignature = (
   rawBody: string,
   providedSignature: string | null,
+  reference?: string,
 ) => {
   const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY
 
   if (!paystackSecretKey || !providedSignature) {
+    paystackError('PAYSTACK WEBHOOK', 'Signature verification failed: missing secret or header', {
+      reference,
+      hasSecretKey: Boolean(paystackSecretKey),
+      hasSignatureHeader: Boolean(providedSignature),
+    })
     return false
   }
 
@@ -251,10 +310,22 @@ const verifyPaystackSignature = (
   const expectedBuffer = Buffer.from(expectedSignature, 'hex')
   const providedBuffer = Buffer.from(providedSignature, 'hex')
 
-  return (
+  const isValid =
     expectedBuffer.length === providedBuffer.length &&
     timingSafeEqual(expectedBuffer, providedBuffer)
-  )
+
+  if (!isValid) {
+    paystackError('PAYSTACK WEBHOOK', 'Signature mismatch', {
+      reference,
+      signatureLength: providedSignature.length,
+    })
+  } else {
+    paystackLog('PAYSTACK WEBHOOK', 'Signature verification passed', {
+      reference,
+    })
+  }
+
+  return isValid
 }
 
 const buildOrderEmailHtml = ({
@@ -339,17 +410,61 @@ const buildOrderEmailHtml = ({
 }
 
 export const POST = async ({ request }: { request: Request }) => {
+  paystackLog('PAYSTACK WEBHOOK', 'Incoming request')
+
   try {
     const rawBody = await request.text()
     const signature = request.headers.get('x-paystack-signature')
 
-    if (!verifyPaystackSignature(rawBody, signature)) {
+    paystackLog('PAYSTACK WEBHOOK', 'Request headers received', {
+      headers: sanitizeHeaders(request.headers),
+      bodyLength: rawBody.length,
+    })
+    paystackLog('PAYSTACK WEBHOOK', 'Raw body received', {
+      rawBody,
+    })
+
+    let payload: PaystackPayload
+    try {
+      payload = JSON.parse(rawBody) as PaystackPayload
+    } catch (parseError) {
+      paystackError(
+        'PAYSTACK WEBHOOK',
+        'Failed to parse webhook body as JSON',
+        { rawBodyPreview: rawBody.slice(0, 500) },
+        parseError,
+      )
+      return jsonResponse({ error: 'Invalid webhook payload' }, 400)
+    }
+
+    const preliminaryReference =
+      typeof payload.data?.reference === 'string'
+        ? payload.data.reference
+        : undefined
+
+    paystackLog('PAYSTACK WEBHOOK', 'Parsed event', {
+      reference: preliminaryReference,
+      event: payload.event,
+      parsedPayload: sanitizeForLog(payload as Record<string, unknown>),
+    })
+
+    if (!verifyPaystackSignature(rawBody, signature, preliminaryReference)) {
+      paystackError('PAYSTACK WEBHOOK', 'Rejecting webhook due to invalid signature', {
+        reference: preliminaryReference,
+      })
       return jsonResponse({ error: 'Invalid Paystack signature' }, 401)
     }
 
-    const payload = JSON.parse(rawBody) as PaystackPayload
+    paystackLog('PAYSTACK WEBHOOK', 'Event type received', {
+      reference: preliminaryReference,
+      eventType: payload.event,
+    })
 
     if (payload.event !== 'charge.success') {
+      paystackLog('PAYSTACK WEBHOOK', 'Ignoring non-charge.success event', {
+        reference: preliminaryReference,
+        eventType: payload.event,
+      })
       return jsonResponse({ status: 'received' }, 200)
     }
 
@@ -358,6 +473,14 @@ export const POST = async ({ request }: { request: Request }) => {
       typeof webhookTransaction?.reference === 'string'
         ? webhookTransaction.reference
         : 'N/A'
+
+    paystackLog('PAYSTACK WEBHOOK', 'Processing charge.success', {
+      reference: webhookReference,
+      amount: webhookTransaction?.amount,
+      customerEmail: webhookTransaction?.customer?.email,
+      hasWebhookMetadata: Boolean(webhookTransaction?.metadata),
+    })
+
     const verifiedTransaction =
       webhookReference !== 'N/A'
         ? await fetchVerifiedTransaction(webhookReference)
@@ -374,9 +497,18 @@ export const POST = async ({ request }: { request: Request }) => {
       typeof transaction?.reference === 'string'
         ? transaction.reference
         : webhookReference
-    const checkout = await getCheckoutForEmail(
-      extractCheckoutId(reference, metadata),
-    )
+    const checkoutId = extractCheckoutId(reference, metadata)
+
+    paystackLog('PAYSTACK WEBHOOK', 'Resolved transaction context', {
+      reference,
+      checkoutId: checkoutId ?? undefined,
+      amountGhs: amount,
+      customerEmail,
+      metadataSource: verifiedTransaction ? 'verify-api' : 'webhook-payload',
+      metadata: sanitizeForLog(metadata),
+    })
+
+    const checkout = await getCheckoutForEmail(checkoutId, reference)
     const checkoutCustomerName = checkout
       ? [
           checkout.shippingAddress.firstName,
@@ -408,6 +540,17 @@ export const POST = async ({ request }: { request: Request }) => {
       : amount
     const displayCustomerEmail = checkout?.email || customerEmail
 
+    paystackLog('PAYSTACK WEBHOOK', 'Prepared order email payload', {
+      reference,
+      checkoutId: checkoutId ?? undefined,
+      customerName,
+      displayAmount,
+      displayCustomerEmail,
+      phoneNumber,
+      orderItemsBreakdown,
+      deliveryInfoPreview: deliveryInfo.slice(0, 200),
+    })
+
     const resend = new Resend(process.env.RESEND_API_KEY)
 
     await resend.emails.send({
@@ -425,9 +568,15 @@ export const POST = async ({ request }: { request: Request }) => {
       }),
     })
 
+    paystackLog('PAYSTACK WEBHOOK', 'Webhook processing succeeded', {
+      reference,
+      checkoutId: checkoutId ?? undefined,
+      emailSent: true,
+    })
+
     return jsonResponse({ status: 'received' }, 200)
   } catch (error) {
-    console.error('Paystack webhook processing failed:', error)
+    paystackError('PAYSTACK WEBHOOK', 'Webhook processing failed', undefined, error)
 
     return jsonResponse({ error: 'Webhook processing failed' }, 500)
   }

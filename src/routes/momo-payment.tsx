@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery, useAction } from 'convex/react'
-import React, { Suspense, useState } from 'react'
+import React, { Suspense, useEffect, useMemo, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
+import { paystackError, paystackLog, sanitizeForLog } from '../lib/paystack-debug'
 
 type MomoPaymentSearch = {
   checkoutId: string
@@ -40,8 +41,6 @@ function MoMoPaymentPage() {
   const navigate = useNavigate()
   const convexApi = api as any
   const { checkoutId } = Route.useSearch()
-  const [paymentStep, setPaymentStep] = useState<'review' | 'success'>('review')
-  const [isPaying, setIsPaying] = useState(false)
 
   const checkout = useQuery(
     convexApi.commerce.getCheckout,
@@ -50,6 +49,38 @@ function MoMoPaymentPage() {
       : 'skip',
   )
   const verifyPayment = useAction(convexApi.commerce.verifyPaystackPayment)
+
+  useEffect(() => {
+    paystackLog('MOMO PAYMENT', 'Component mounted', {
+      checkoutId: checkoutId || undefined,
+    })
+  }, [checkoutId])
+
+  useEffect(() => {
+    if (checkout === undefined) {
+      paystackLog('MOMO PAYMENT', 'Checkout query loading', {
+        checkoutId,
+      })
+      return
+    }
+
+    if (checkout === null) {
+      paystackLog('MOMO PAYMENT', 'Checkout not found', { checkoutId })
+      return
+    }
+
+    paystackLog('MOMO PAYMENT', 'Checkout loaded', {
+      checkoutId: checkout._id,
+      checkoutPayload: sanitizeForLog({
+        email: checkout.email,
+        totalAmount: checkout.totalAmount,
+        paymentReference: checkout.paymentReference,
+        momoNumber: checkout.momoNumber,
+        status: checkout.status,
+        itemCount: checkout.items?.length ?? 0,
+      }),
+    })
+  }, [checkout, checkoutId])
 
   if (!checkoutId) {
     return (
@@ -109,6 +140,51 @@ function MoMoPaymentPage() {
     )
   }
 
+  return (
+    <MoMoPaymentCheckout
+      checkout={checkout}
+      verifyPayment={verifyPayment}
+      navigate={navigate}
+    />
+  )
+}
+
+type MoMoCheckout = {
+  _id: Id<'checkouts'>
+  email: string
+  momoNumber: string
+  paymentReference: string
+  totalAmount: number
+  currency?: string
+  status: string
+  paymentMethod: string
+  items?: CheckoutItemSummary[]
+  shippingAddress: {
+    firstName: string
+    lastName: string
+    phone: string
+    addressLine1: string
+    region: string
+    city: string
+    country: string
+  }
+}
+
+function MoMoPaymentCheckout({
+  checkout,
+  verifyPayment,
+  navigate,
+}: {
+  checkout: MoMoCheckout
+  verifyPayment: (args: {
+    reference: string
+    checkoutId: Id<'checkouts'>
+  }) => Promise<unknown>
+  navigate: ReturnType<typeof useNavigate>
+}) {
+  const [paymentStep, setPaymentStep] = useState<'review' | 'success'>('review')
+  const [isPaying, setIsPaying] = useState(false)
+
   const customerName =
     `${checkout.shippingAddress.firstName} ${checkout.shippingAddress.lastName}`.trim()
   const deliveryInfo = [
@@ -122,62 +198,139 @@ function MoMoPaymentPage() {
   const orderItemsBreakdown = formatOrderItemsBreakdown(checkout.items)
   const phoneNumber = checkout.shippingAddress.phone || checkout.momoNumber
 
-  const paystackConfig = {
-    reference: `${checkout._id}_${Date.now()}`,
-    email: checkout.email || '',
-    amount: Math.round((checkout.totalAmount || 0) * 100),
-    publicKey: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
-    currency: checkout.currency || 'GHS',
-    metadata: {
-      checkout_id: checkout._id,
-      customer_name: customerName,
-      phone_number: phoneNumber,
-      delivery_info: deliveryInfo,
-      order_items_breakdown: orderItemsBreakdown,
-      custom_fields: [
-        {
-          display_name: 'Customer Name',
-          variable_name: 'customer_name',
-          value: customerName,
-        },
-        {
-          display_name: 'Phone Number',
-          variable_name: 'phone_number',
-          value: phoneNumber,
-        },
-        {
-          display_name: 'Delivery Info',
-          variable_name: 'delivery_info',
-          value: deliveryInfo,
-        },
-        {
-          display_name: 'Order Items Breakdown',
-          variable_name: 'order_items_breakdown',
-          value: orderItemsBreakdown,
-        },
-      ],
-    },
-  }
+  const paymentReference = useMemo(
+    () => `${checkout._id}_${Date.now()}`,
+    [checkout._id],
+  )
 
-  const onSuccess = async (response: any) => {
+  const paystackConfig = useMemo(
+    () => ({
+      reference: paymentReference,
+      email: checkout.email || '',
+      amount: Math.round((checkout.totalAmount || 0) * 100),
+      publicKey: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
+      currency: checkout.currency || 'GHS',
+      metadata: {
+        checkout_id: checkout._id,
+        customer_name: customerName,
+        phone_number: phoneNumber,
+        delivery_info: deliveryInfo,
+        order_items_breakdown: orderItemsBreakdown,
+        custom_fields: [
+          {
+            display_name: 'Customer Name',
+            variable_name: 'customer_name',
+            value: customerName,
+          },
+          {
+            display_name: 'Phone Number',
+            variable_name: 'phone_number',
+            value: phoneNumber,
+          },
+          {
+            display_name: 'Delivery Info',
+            variable_name: 'delivery_info',
+            value: deliveryInfo,
+          },
+          {
+            display_name: 'Order Items Breakdown',
+            variable_name: 'order_items_breakdown',
+            value: orderItemsBreakdown,
+          },
+        ],
+      },
+    }),
+    [
+      checkout._id,
+      checkout.currency,
+      checkout.email,
+      checkout.totalAmount,
+      customerName,
+      deliveryInfo,
+      orderItemsBreakdown,
+      paymentReference,
+      phoneNumber,
+    ],
+  )
+
+  useEffect(() => {
+    paystackLog('MOMO PAYMENT', 'Paystack config prepared', {
+      checkoutId: checkout._id,
+      reference: paystackConfig.reference,
+      amountGhs: checkout.totalAmount,
+      amountInPesewas: paystackConfig.amount,
+      email: checkout.email,
+      metadata: sanitizeForLog(paystackConfig.metadata),
+    })
+  }, [checkout._id, checkout.email, checkout.totalAmount, paystackConfig])
+
+  useEffect(() => {
+    paystackLog('MOMO PAYMENT', 'Loading state changed', {
+      checkoutId: checkout._id,
+      isPaying,
+      paymentStep,
+    })
+  }, [checkout._id, isPaying, paymentStep])
+
+  const onSuccess = async (response: { reference?: string }) => {
+    const reference = response.reference ?? 'unknown'
+
+    paystackLog('MOMO PAYMENT', 'Paystack onSuccess callback received', {
+      checkoutId: checkout._id,
+      reference,
+      response: sanitizeForLog(response as Record<string, unknown>),
+    })
+
     setIsPaying(true)
+    paystackLog('MOMO PAYMENT', 'Starting server verification', {
+      checkoutId: checkout._id,
+      reference,
+    })
+
     try {
-      await verifyPayment({
-        reference: response.reference,
+      const verifyResult = await verifyPayment({
+        reference,
         checkoutId: checkout._id,
       })
+
+      paystackLog('MOMO PAYMENT', 'Verification succeeded', {
+        checkoutId: checkout._id,
+        reference,
+        verifyResult: sanitizeForLog(verifyResult as Record<string, unknown>),
+      })
+
       setPaymentStep('success')
+      paystackLog('MOMO PAYMENT', 'Payment step set to success', {
+        checkoutId: checkout._id,
+        reference,
+      })
     } catch (error) {
-      console.error(error)
+      paystackError(
+        'MOMO PAYMENT',
+        'Payment verification failed',
+        {
+          checkoutId: checkout._id,
+          reference,
+        },
+        error,
+      )
       alert('Payment verification failed. Please contact support.')
     } finally {
       setIsPaying(false)
+      paystackLog('MOMO PAYMENT', 'Payment flow finished', {
+        checkoutId: checkout._id,
+        reference,
+        isPaying: false,
+      })
     }
   }
 
   const onClose = () => {
     setIsPaying(false)
-    console.log('Payment modal closed')
+    paystackLog('MOMO PAYMENT', 'Paystack modal closed by user', {
+      checkoutId: checkout._id,
+      reference: paystackConfig.reference,
+    })
   }
 
   if (paymentStep === 'success') {
@@ -251,7 +404,13 @@ function MoMoPaymentPage() {
                 onClose={onClose}
                 isPaying={isPaying}
                 isPaid={checkout.status === 'paid'}
-                onInitiate={() => setIsPaying(true)}
+                onInitiate={() => {
+                  paystackLog('MOMO PAYMENT', 'Payment button clicked', {
+                    checkoutId: checkout._id,
+                    reference: paystackConfig.reference,
+                  })
+                  setIsPaying(true)
+                }}
               />
             </Suspense>
             <button

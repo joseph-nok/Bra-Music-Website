@@ -8,6 +8,7 @@ import {
 import { internal } from './_generated/api'
 import { v } from 'convex/values'
 import type { Id } from './_generated/dataModel'
+import { paystackError, paystackLog, sanitizeForLog } from './paystackDebug'
 
 const productLineValidator = v.union(v.literal('merch'), v.literal('cap'))
 const sizeValidator = v.union(
@@ -516,29 +517,57 @@ export const verifyPaystackPayment = action({
     checkoutId: v.id('checkouts'),
   },
   handler: async (ctx, args) => {
+    const logContext = {
+      reference: args.reference,
+      checkoutId: args.checkoutId,
+    }
+
+    paystackLog('VERIFY PAYMENT', 'Starting verification', logContext)
+
     const secretKey =
       process.env.PAYSTACK_SECRET_KEY || process.env.PAYSTACK_PRIVATE_KEY
     if (!secretKey) {
+      paystackError('VERIFY PAYMENT', 'PAYSTACK_SECRET_KEY is not configured', logContext)
       throw new Error('PAYSTACK_SECRET_KEY is not configured')
     }
 
-    const response = await fetch(
-      `https://api.paystack.co/transaction/verify/${args.reference}`,
-      {
-        headers: {
-          Authorization: `Bearer ${secretKey}`,
-        },
+    const verifyUrl = `https://api.paystack.co/transaction/verify/${args.reference}`
+    paystackLog('VERIFY PAYMENT', 'Sending Paystack verify request', {
+      ...logContext,
+      verifyUrl,
+    })
+
+    const response = await fetch(verifyUrl, {
+      headers: {
+        Authorization: `Bearer ${secretKey}`,
       },
-    )
+    })
     const data = await response.json()
+
+    paystackLog('VERIFY PAYMENT', 'Paystack verify response received', {
+      ...logContext,
+      httpStatus: response.status,
+      paystackStatus: data.status,
+      transactionStatus: data.data?.status,
+      responseBody: sanitizeForLog(data as Record<string, unknown>),
+    })
+
     if (!response.ok) {
-      console.error(
-        'Paystack verify request failed:',
-        JSON.stringify(data, null, 2),
-      )
+      paystackError('VERIFY PAYMENT', 'Paystack verify request failed', {
+        ...logContext,
+        httpStatus: response.status,
+        message: data.message,
+      })
       throw new Error(data.message || 'Payment verification request failed')
     }
     if (data.status && data.data?.status === 'success') {
+      paystackLog('VERIFY PAYMENT', 'Paystack transaction verified successfully', {
+        ...logContext,
+        amount: data.data?.amount,
+        customerEmail: data.data?.customer?.email,
+        hasMetadata: Boolean(data.data?.metadata),
+      })
+
       const verifiedMetadata = data.data?.metadata as
         | PaystackMetadataRecord
         | undefined
@@ -549,11 +578,26 @@ export const verifyPaystackPayment = action({
           metadataFallback: verifiedMetadata,
         },
       )
+
+      paystackLog('VERIFY PAYMENT', 'Loaded order email data', {
+        ...logContext,
+        customerName: order.customerName,
+        orderItemsBreakdown: order.orderItemsBreakdown,
+        alreadyEmailed: Boolean(order.orderNotificationEmailSentAt),
+      })
+
       const paymentResult: { alreadyPaid: boolean } = await ctx.runMutation(
         internal.commerce.completePaymentInternal,
         { checkoutId: args.checkoutId },
       )
+
+      paystackLog('VERIFY PAYMENT', 'Database payment status updated', {
+        ...logContext,
+        alreadyPaid: paymentResult.alreadyPaid,
+      })
+
       if (order.orderNotificationEmailSentAt) {
+        paystackLog('VERIFY PAYMENT', 'Verification succeeded; email already sent', logContext)
         return { success: true, emailSent: true }
       }
 
@@ -568,8 +612,17 @@ export const verifyPaystackPayment = action({
       )
 
       if (!emailResult.success) {
-        console.error('Paid order email failed:', emailResult.error)
+        paystackError('VERIFY PAYMENT', 'Paid order email failed', {
+          ...logContext,
+          emailError: emailResult.error,
+        })
       }
+
+      paystackLog('VERIFY PAYMENT', 'Verification flow completed', {
+        ...logContext,
+        emailSent: emailResult.success,
+        alreadyPaid: paymentResult.alreadyPaid,
+      })
 
       return {
         success: true,
@@ -578,10 +631,10 @@ export const verifyPaystackPayment = action({
         alreadyPaid: paymentResult.alreadyPaid,
       }
     }
-    console.error(
-      'Paystack verify response was not successful:',
-      JSON.stringify(data, null, 2),
-    )
+    paystackError('VERIFY PAYMENT', 'Paystack verify response was not successful', {
+      ...logContext,
+      responseBody: sanitizeForLog(data as Record<string, unknown>),
+    })
     throw new Error('Payment verification failed')
   },
 })

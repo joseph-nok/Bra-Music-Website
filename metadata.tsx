@@ -1,5 +1,6 @@
 import { createServerFn, useServerFn } from '@tanstack/react-start'
 import { useState } from 'react'
+import { paystackError, paystackLog, sanitizeForLog } from './src/lib/paystack-debug'
 
 declare const process: {
   env: {
@@ -105,10 +106,25 @@ function formatCartItemsBreakdown(cart: CartItem[]) {
 export const initializePayment = createServerFn({ method: 'POST' })
   .inputValidator((data: CheckoutInput) => data)
   .handler(async ({ data }) => {
+    paystackLog('INIT PAYMENT', 'Function entry', {
+      checkoutData: sanitizeForLog({
+        email: data.email,
+        amountGhs: data.amountGhs,
+        customerName: data.customerName,
+        phone: data.phone,
+        address: data.address,
+        city: data.city,
+        region: data.region,
+        cartItemCount: data.cart.length,
+        cart: data.cart,
+      }),
+    })
+
     validateCheckoutInput(data)
 
     const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY
     if (!paystackSecretKey) {
+      paystackError('INIT PAYMENT', 'PAYSTACK_SECRET_KEY is not configured on the server')
       throw new Error('PAYSTACK_SECRET_KEY is not configured on the server.')
     }
 
@@ -123,6 +139,18 @@ export const initializePayment = createServerFn({ method: 'POST' })
     const markdownCartSummary = formatCartItemsBreakdown(data.cart)
 
     const amountInPesewas = Math.round(data.amountGhs * 100)
+
+    paystackLog('INIT PAYMENT', 'Prepared Paystack initialize payload', {
+      email: data.email,
+      amountGhs: data.amountGhs,
+      amountInPesewas,
+      metadata: sanitizeForLog({
+        customer_name: data.customerName,
+        phone_number: data.phone,
+        delivery_info: markdownAddress,
+        order_items_breakdown: markdownCartSummary,
+      }),
+    })
 
     const response = await fetch(
       'https://api.paystack.co/transaction/initialize',
@@ -170,9 +198,25 @@ export const initializePayment = createServerFn({ method: 'POST' })
 
     const result = (await response.json()) as PaystackInitializeResponse
 
+    paystackLog('INIT PAYMENT', 'Paystack initialize response received', {
+      httpStatus: response.status,
+      paystackStatus: result.status,
+      message: result.message,
+      authorizationUrl: result.data?.authorization_url,
+      responseBody: sanitizeForLog(result as unknown as Record<string, unknown>),
+    })
+
     if (!response.ok || !result.status || !result.data?.authorization_url) {
+      paystackError('INIT PAYMENT', 'Paystack transaction setup failed', {
+        httpStatus: response.status,
+        message: result.message,
+      })
       throw new Error(result.message || 'Paystack transaction setup failed.')
     }
+
+    paystackLog('INIT PAYMENT', 'Payment initialization succeeded', {
+      authorizationUrl: result.data.authorization_url,
+    })
 
     return { url: result.data.authorization_url }
   })
@@ -191,16 +235,34 @@ export default function MetadataComponent({
     setIsLoading(true)
     setErrorMessage('')
 
+    paystackLog('MOMO PAYMENT', 'Sending init request from MetadataComponent', {
+      checkoutId: checkout.email,
+      amountGhs: checkout.amountGhs,
+      customerName: checkout.customerName,
+    })
+
     try {
       const redirectData = await initializePaymentFn({
         data: checkout,
       })
 
+      paystackLog('MOMO PAYMENT', 'Init request succeeded', {
+        redirectUrl: redirectData.url,
+      })
+
       if (redirectData.url) {
+        paystackLog('MOMO PAYMENT', 'Redirecting to Paystack authorization URL', {
+          redirectUrl: redirectData.url,
+        })
         window.location.href = redirectData.url
       }
     } catch (error) {
-      console.error('Paystack checkout error:', error)
+      paystackError(
+        'MOMO PAYMENT',
+        'Paystack checkout initialization failed',
+        { amountGhs: checkout.amountGhs },
+        error,
+      )
       setErrorMessage(
         error instanceof Error
           ? error.message
