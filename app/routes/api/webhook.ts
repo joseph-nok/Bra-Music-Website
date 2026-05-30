@@ -309,6 +309,18 @@ export const POST = async ({ request }: { request: Request }) => {
 
     const transaction = payload.data
     const metadata = transaction?.metadata
+    console.log('=== PAYSTACK WEBHOOK METADATA ===')
+    console.log(JSON.stringify(metadata, null, 2))
+    console.log('=== END PAYSTACK WEBHOOK METADATA ===')
+
+    console.log('=== PAYSTACK TRANSACTION ===')
+    console.log(JSON.stringify(transaction, null, 2))
+    console.log('=== END PAYSTACK TRANSACTION ===')
+
+    console.log(
+      'EXTRACTED ORDER ITEMS:',
+      getCustomFieldValue(metadata, 'order_items_breakdown'),
+    )
     const amount = formatGhsAmount(transaction?.amount)
     const customerEmail =
       typeof transaction?.customer?.email === 'string'
