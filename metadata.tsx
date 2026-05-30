@@ -90,27 +90,13 @@ function validateCheckoutInput(data: CheckoutInput) {
 function formatCartItemsBreakdown(cart: CartItem[]) {
   if (!cart.length) return 'N/A'
 
-  const productGroups = new Map<string, Map<string, number>>()
-
-  for (const item of cart) {
-    const productName = item.name.trim() || 'Merch'
-    const color = item.color?.trim() || 'Color not specified'
-    const variantLabel = `${item.size.trim()}: ${color}`
-    const variants = productGroups.get(productName) ?? new Map<string, number>()
-    variants.set(variantLabel, (variants.get(variantLabel) ?? 0) + item.quantity)
-    productGroups.set(productName, variants)
-  }
-
-  return [...productGroups]
-    .map(([productName, variants]) =>
-      [
-        productName,
-        ...[...variants].map(
-          ([variantLabel, quantity]) => `${variantLabel} ${quantity}`,
-        ),
-      ].join('\n'),
-    )
-    .join('\n\n')
+  return cart
+    .map((item) => {
+      const productName = item.name.trim() || 'Merch'
+      const color = item.color?.trim() || 'Color not specified'
+      return `${item.quantity}x ${productName} - Color: ${color}, Size: ${item.size.trim()}`
+    })
+    .join('\n')
 }
 
 // ==========================================

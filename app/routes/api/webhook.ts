@@ -1,5 +1,8 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
+import { ConvexHttpClient } from 'convex/browser'
 import { Resend } from 'resend'
+import { api } from '../../../convex/_generated/api'
+import type { Id } from '../../../convex/_generated/dataModel'
 
 type PaystackCustomField = {
   variable_name?: unknown
@@ -21,6 +24,31 @@ type PaystackPayload = {
     }
     metadata?: PaystackMetadata
   }
+}
+
+type CheckoutItem = {
+  productName: string
+  quantity: number
+  color: string
+  size: string
+}
+
+type CheckoutForEmail = {
+  _id: Id<'checkouts'>
+  email: string
+  momoNumber: string
+  paymentReference: string
+  totalAmount: number
+  shippingAddress: {
+    country: string
+    firstName: string
+    lastName: string
+    phone: string
+    addressLine1: string
+    region: string
+    city: string
+  }
+  items: CheckoutItem[]
 }
 
 const isPaystackCustomField = (value: unknown): value is PaystackCustomField =>
@@ -88,6 +116,65 @@ const formatGhsAmount = (amount: unknown): string => {
   }
 
   return (pesewas / 100).toFixed(2)
+}
+
+const formatCheckoutAmount = (amount: number): string => {
+  if (!Number.isFinite(amount)) {
+    return '0.00'
+  }
+
+  return amount.toFixed(2)
+}
+
+const formatCheckoutOrderItems = (items: CheckoutItem[]): string => {
+  if (!items.length) {
+    return 'N/A'
+  }
+
+  return items
+    .map((item) => {
+      const productName = item.productName.trim() || 'Merch'
+      return `${item.quantity}x ${productName} - Color: ${item.color.trim()}, Size: ${item.size.trim()}`
+    })
+    .join('\n')
+}
+
+const extractCheckoutId = (
+  reference: string,
+  metadata: PaystackMetadata | undefined,
+): Id<'checkouts'> | null => {
+  const metadataCheckoutId = getCustomFieldValue(metadata, 'checkout_id')
+  if (metadataCheckoutId !== 'N/A') {
+    return metadataCheckoutId as Id<'checkouts'>
+  }
+
+  const referenceCheckoutId = reference.split('_')[0]?.trim()
+  return referenceCheckoutId ? (referenceCheckoutId as Id<'checkouts'>) : null
+}
+
+const getConvexUrl = () =>
+  process.env.CONVEX_URL ||
+  process.env.VITE_CONVEX_URL ||
+  process.env.NEXT_PUBLIC_CONVEX_URL ||
+  ''
+
+const getCheckoutForEmail = async (
+  checkoutId: Id<'checkouts'> | null,
+): Promise<CheckoutForEmail | null> => {
+  const convexUrl = getConvexUrl()
+  if (!checkoutId || !convexUrl) {
+    return null
+  }
+
+  try {
+    const convex = new ConvexHttpClient(convexUrl)
+    return (await convex.query(api.commerce.getCheckout, {
+      checkoutId,
+    })) as CheckoutForEmail | null
+  } catch (error) {
+    console.error('Could not load checkout for order email:', error)
+    return null
+  }
 }
 
 const verifyPaystackSignature = (
@@ -218,23 +305,51 @@ export const POST = async ({ request }: { request: Request }) => {
         : 'N/A'
     const reference =
       typeof transaction?.reference === 'string' ? transaction.reference : 'N/A'
-    const customerName = getCustomFieldValue(metadata, 'customer_name')
-    const phoneNumber = getCustomFieldValue(metadata, 'phone_number')
-    const deliveryInfo = getCustomFieldValue(metadata, 'delivery_info')
-    const orderItemsBreakdown = getCustomFieldValue(
-      metadata,
-      'order_items_breakdown',
+    const checkout = await getCheckoutForEmail(
+      extractCheckoutId(reference, metadata),
     )
+    const checkoutCustomerName = checkout
+      ? [
+          checkout.shippingAddress.firstName,
+          checkout.shippingAddress.lastName,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .trim()
+      : ''
+    const customerName =
+      checkoutCustomerName || getCustomFieldValue(metadata, 'customer_name')
+    const phoneNumber =
+      checkout?.shippingAddress.phone ||
+      checkout?.momoNumber ||
+      getCustomFieldValue(metadata, 'phone_number')
+    const deliveryInfo = checkout
+      ? [
+          customerName,
+          checkout.shippingAddress.addressLine1,
+          `${checkout.shippingAddress.city}, ${checkout.shippingAddress.region}`,
+          checkout.shippingAddress.country,
+        ]
+          .filter(Boolean)
+          .join('\n')
+      : getCustomFieldValue(metadata, 'delivery_info')
+    const orderItemsBreakdown = checkout
+      ? formatCheckoutOrderItems(checkout.items)
+      : getCustomFieldValue(metadata, 'order_items_breakdown')
+    const displayAmount = checkout
+      ? formatCheckoutAmount(checkout.totalAmount)
+      : amount
+    const displayCustomerEmail = checkout?.email || customerEmail
 
     const resend = new Resend(process.env.RESEND_API_KEY)
 
     await resend.emails.send({
       from: 'Baah Prosper Music <onboarding@resend.dev>',
       to: ['josephnok088@gmail.com'],
-      subject: `🔔 New Order: GHS ${amount} from ${customerName}`,
+      subject: `🔔 New Order: GHS ${displayAmount} from ${customerName}`,
       html: buildOrderEmailHtml({
-        amount,
-        customerEmail,
+        amount: displayAmount,
+        customerEmail: displayCustomerEmail,
         customerName,
         deliveryInfo,
         orderItemsBreakdown,

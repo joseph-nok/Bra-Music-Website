@@ -82,28 +82,14 @@ function formatGhsAmount(amount: number) {
 function formatOrderItemsBreakdown(items: OrderItemSummary[]) {
   if (!items.length) return 'N/A'
 
-  const productGroups = new Map<string, Map<string, number>>()
-
-  for (const item of items) {
-    const productName = item.productName.trim() || 'Merch'
-    const size = item.size.trim()
-    const color = item.color.trim()
-    const variantLabel = `${size}: ${color}`
-    const variants = productGroups.get(productName) ?? new Map<string, number>()
-    variants.set(variantLabel, (variants.get(variantLabel) ?? 0) + item.quantity)
-    productGroups.set(productName, variants)
-  }
-
-  return [...productGroups]
-    .map(([productName, variants]) =>
-      [
-        productName,
-        ...[...variants].map(([variantLabel, quantity]) => {
-          return `${variantLabel} ${quantity}`
-        }),
-      ].join('\n'),
-    )
-    .join('\n\n')
+  return items
+    .map((item) => {
+      const productName = item.productName.trim() || 'Merch'
+      const color = item.color.trim()
+      const size = item.size.trim()
+      return `${item.quantity}x ${productName} - Color: ${color}, Size: ${size}`
+    })
+    .join('\n')
 }
 
 function buildOrderEmailHtml({

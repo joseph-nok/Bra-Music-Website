@@ -28,26 +28,12 @@ type CheckoutItemSummary = {
 function formatOrderItemsBreakdown(items: CheckoutItemSummary[] = []) {
   if (!items.length) return 'N/A'
 
-  const productGroups = new Map<string, Map<string, number>>()
-
-  for (const item of items) {
-    const productName = item.productName.trim() || 'Merch'
-    const variantLabel = `${item.size.trim()}: ${item.color.trim()}`
-    const variants = productGroups.get(productName) ?? new Map<string, number>()
-    variants.set(variantLabel, (variants.get(variantLabel) ?? 0) + item.quantity)
-    productGroups.set(productName, variants)
-  }
-
-  return [...productGroups]
-    .map(([productName, variants]) =>
-      [
-        productName,
-        ...[...variants].map(
-          ([variantLabel, quantity]) => `${variantLabel} ${quantity}`,
-        ),
-      ].join('\n'),
-    )
-    .join('\n\n')
+  return items
+    .map((item) => {
+      const productName = item.productName.trim() || 'Merch'
+      return `${item.quantity}x ${productName} - Color: ${item.color.trim()}, Size: ${item.size.trim()}`
+    })
+    .join('\n')
 }
 
 function MoMoPaymentPage() {
