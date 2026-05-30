@@ -20,7 +20,10 @@ const config = defineConfig({
       },
     }),
     // Run after TanStack + React so SSR/router bundles are not pre-transformed inconsistently
-    nitro({ rollupConfig: { external: [/^@sentry\//] } }),
+    nitro({
+      serverDir: './server',
+      rollupConfig: { external: [/^@sentry\//] },
+    }),
   ],
 })
 
