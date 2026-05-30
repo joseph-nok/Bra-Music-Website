@@ -212,7 +212,7 @@ export const POST = async ({ request }: { request: Request }) => {
     const resend = new Resend(process.env.RESEND_API_KEY)
 
     await resend.emails.send({
-      from: 'Orders <orders@baahprospermusic.com>',
+      from: 'Baah Prosper Music <onboarding@resend.dev>',
       to: ['josephnok088@gmail.com'],
       subject: `🔔 New Order: GHS ${amount} from ${customerName}`,
       html: buildOrderEmailHtml({
