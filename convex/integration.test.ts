@@ -145,9 +145,13 @@ describe('Convex backend integration', () => {
       checkoutId: checkout.checkoutId,
     })
     expect(stored?.status).toBe('pending')
-    expect(stored?.orderItemsBreakdown).toBe(
-      '1x Ministry Cap - Color: Black, Size: L',
-    )
+    expect(stored?.items).toHaveLength(1)
+    expect(stored?.items[0]).toMatchObject({
+      productName: 'Ministry Cap',
+      quantity: 1,
+      color: 'Black',
+      size: 'L',
+    })
 
     const paid = await t.mutation(api.commerce.completeTestPayment, {
       checkoutId: checkout.checkoutId,

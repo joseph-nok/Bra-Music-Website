@@ -267,7 +267,6 @@ export const startCheckout = mutation({
 
     // Generate payment reference from event
     const generatedPaymentReference = `Purchase for ${eventTitle} ministry`
-    const orderItemsBreakdown = formatOrderItemsBreakdown(checkoutItems)
 
     const checkoutId = await ctx.db.insert('checkouts', {
       cartId: args.cartId,
@@ -279,7 +278,6 @@ export const startCheckout = mutation({
       momoNumber: args.momoNumber.trim(),
       currency: 'GHS',
       totalAmount,
-      orderItemsBreakdown,
       shippingAddress: args.shippingAddress,
     })
 
@@ -426,9 +424,9 @@ export const getOrderEmailData = internalQuery({
       .filter(Boolean)
       .join('\n')
 
-    const orderItemsBreakdown =
-      checkout.orderItemsBreakdown ||
-      (items.length ? formatOrderItemsBreakdown(items) : 'N/A')
+    const orderItemsBreakdown = items.length
+      ? formatOrderItemsBreakdown(items)
+      : 'N/A'
 
     return {
       checkoutId: checkout._id,
