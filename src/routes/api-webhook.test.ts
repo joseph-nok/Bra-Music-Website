@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   checkoutResult: null as unknown,
   resendSend: vi.fn(),
   convexQuery: vi.fn(),
+  verifyMetadata: {} as Record<string, unknown>,
+  verifyShouldFail: false,
 }))
 
 vi.mock('convex/browser', () => ({
@@ -20,6 +22,47 @@ vi.mock('resend', () => ({
     },
   })),
 }))
+
+vi.stubGlobal(
+  'fetch',
+  vi.fn(async (url: string | URL | Request) => {
+    const urlString = typeof url === 'string' ? url : url.toString()
+
+    if (!urlString.includes('api.paystack.co/transaction/verify/')) {
+      throw new Error(`Unexpected fetch: ${urlString}`)
+    }
+
+    if (mocks.verifyShouldFail) {
+      return {
+        ok: false,
+        status: 400,
+        json: async () => ({
+          status: false,
+          message: 'Verification failed',
+        }),
+      }
+    }
+
+    const reference = decodeURIComponent(urlString.split('/').pop() ?? '')
+
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status: true,
+        data: {
+          status: 'success',
+          reference,
+          amount: 42500,
+          customer: {
+            email: 'paystack@example.com',
+          },
+          metadata: mocks.verifyMetadata,
+        },
+      }),
+    }
+  }),
+)
 
 const { POST } = await import('../../app/routes/api/webhook')
 
@@ -39,6 +82,8 @@ function signedRequest(payload: unknown) {
 }
 
 function chargeSuccessPayload(metadata: Record<string, unknown>) {
+  mocks.verifyMetadata = metadata
+
   return {
     event: 'charge.success',
     data: {
@@ -75,12 +120,14 @@ describe('Paystack webhook order item fallback', () => {
     process.env.RESEND_API_KEY = 'test-resend-key'
     process.env.CONVEX_URL = 'https://example.convex.cloud'
     mocks.checkoutResult = null
+    mocks.verifyMetadata = {}
+    mocks.verifyShouldFail = false
     mocks.resendSend.mockReset()
     mocks.convexQuery.mockReset()
     mocks.convexQuery.mockImplementation(() => mocks.checkoutResult)
   })
 
-  it('falls back to metadata when checkout exists with empty items', async () => {
+  it('falls back to verified metadata when checkout exists with empty items', async () => {
     mocks.checkoutResult = {
       ...checkoutBase,
       items: [],
@@ -102,7 +149,7 @@ describe('Paystack webhook order item fallback', () => {
     )
   })
 
-  it('falls back to metadata when checkout has no items property', async () => {
+  it('falls back to verified metadata when checkout has no items property', async () => {
     mocks.checkoutResult = { ...checkoutBase }
 
     const response = await POST({
@@ -148,7 +195,36 @@ describe('Paystack webhook order item fallback', () => {
     expect(html).not.toContain('Metadata fallback should not win')
   })
 
-  it('uses direct metadata when no checkout is found', async () => {
+  it('uses verified metadata when webhook metadata is stripped', async () => {
+    mocks.checkoutResult = {
+      ...checkoutBase,
+      items: [],
+    }
+    mocks.verifyMetadata = {
+      checkout_id: 'checkout-1',
+      order_items_breakdown: '2x Verified Shirt - Color: blue, Size: M',
+    }
+
+    const response = await POST({
+      request: signedRequest({
+        event: 'charge.success',
+        data: {
+          amount: 42500,
+          reference: 'checkout-1_1780165655356',
+          customer: {
+            email: 'paystack@example.com',
+          },
+        },
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(mocks.resendSend.mock.calls[0][0].html).toContain(
+      '2x Verified Shirt - Color: blue, Size: M',
+    )
+  })
+
+  it('uses direct verified metadata when no checkout is found', async () => {
     mocks.checkoutResult = null
 
     const response = await POST({
@@ -166,7 +242,7 @@ describe('Paystack webhook order item fallback', () => {
     )
   })
 
-  it('uses custom field metadata when no checkout is found', async () => {
+  it('uses verified custom field metadata when no checkout is found', async () => {
     mocks.checkoutResult = null
 
     const response = await POST({
@@ -187,6 +263,28 @@ describe('Paystack webhook order item fallback', () => {
     expect(response.status).toBe(200)
     expect(mocks.resendSend.mock.calls[0][0].html).toContain(
       '1x Custom Field Cap - Color: Black, Size: L',
+    )
+  })
+
+  it('falls back to webhook metadata when verify request fails', async () => {
+    mocks.checkoutResult = {
+      ...checkoutBase,
+      items: [],
+    }
+    mocks.verifyShouldFail = true
+
+    const response = await POST({
+      request: signedRequest(
+        chargeSuccessPayload({
+          checkout_id: 'checkout-1',
+          order_items_breakdown: '1x Webhook Fallback Tee - Color: white, Size: L',
+        }),
+      ),
+    })
+
+    expect(response.status).toBe(200)
+    expect(mocks.resendSend.mock.calls[0][0].html).toContain(
+      '1x Webhook Fallback Tee - Color: white, Size: L',
     )
   })
 })

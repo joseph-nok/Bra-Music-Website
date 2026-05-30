@@ -14,16 +14,25 @@ type PaystackMetadata = {
   [key: string]: unknown
 }
 
+type PaystackTransaction = {
+  amount?: unknown
+  reference?: unknown
+  status?: unknown
+  customer?: {
+    email?: unknown
+  }
+  metadata?: PaystackMetadata
+}
+
 type PaystackPayload = {
   event?: unknown
-  data?: {
-    amount?: unknown
-    reference?: unknown
-    customer?: {
-      email?: unknown
-    }
-    metadata?: PaystackMetadata
-  }
+  data?: PaystackTransaction
+}
+
+type PaystackVerifyResponse = {
+  status?: boolean
+  message?: string
+  data?: PaystackTransaction
 }
 
 type CheckoutItem = {
@@ -188,6 +197,43 @@ const getCheckoutForEmail = async (
   }
 }
 
+const fetchVerifiedTransaction = async (
+  reference: string,
+): Promise<PaystackTransaction | null> => {
+  const secretKey =
+    process.env.PAYSTACK_SECRET_KEY || process.env.PAYSTACK_PRIVATE_KEY
+
+  if (!secretKey) {
+    console.error('Paystack verify skipped: PAYSTACK_SECRET_KEY is not configured')
+    return null
+  }
+
+  try {
+    const response = await fetch(
+      `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${secretKey}`,
+        },
+      },
+    )
+    const data = (await response.json()) as PaystackVerifyResponse
+
+    if (!response.ok || !data.status || data.data?.status !== 'success') {
+      console.error(
+        'Paystack verify failed for webhook:',
+        data.message || response.status,
+      )
+      return null
+    }
+
+    return data.data ?? null
+  } catch (error) {
+    console.error('Paystack verify request failed:', error)
+    return null
+  }
+}
+
 const verifyPaystackSignature = (
   rawBody: string,
   providedSignature: string | null,
@@ -307,27 +353,27 @@ export const POST = async ({ request }: { request: Request }) => {
       return jsonResponse({ status: 'received' }, 200)
     }
 
-    const transaction = payload.data
-    const metadata = transaction?.metadata
-    console.log('=== PAYSTACK WEBHOOK METADATA ===')
-    console.log(JSON.stringify(metadata, null, 2))
-    console.log('=== END PAYSTACK WEBHOOK METADATA ===')
-
-    console.log('=== PAYSTACK TRANSACTION ===')
-    console.log(JSON.stringify(transaction, null, 2))
-    console.log('=== END PAYSTACK TRANSACTION ===')
-
-    console.log(
-      'EXTRACTED ORDER ITEMS:',
-      getCustomFieldValue(metadata, 'order_items_breakdown'),
-    )
+    const webhookTransaction = payload.data
+    const webhookReference =
+      typeof webhookTransaction?.reference === 'string'
+        ? webhookTransaction.reference
+        : 'N/A'
+    const verifiedTransaction =
+      webhookReference !== 'N/A'
+        ? await fetchVerifiedTransaction(webhookReference)
+        : null
+    const transaction = verifiedTransaction ?? webhookTransaction
+    const metadata =
+      transaction?.metadata ?? webhookTransaction?.metadata ?? {}
     const amount = formatGhsAmount(transaction?.amount)
     const customerEmail =
       typeof transaction?.customer?.email === 'string'
         ? transaction.customer.email
         : 'N/A'
     const reference =
-      typeof transaction?.reference === 'string' ? transaction.reference : 'N/A'
+      typeof transaction?.reference === 'string'
+        ? transaction.reference
+        : webhookReference
     const checkout = await getCheckoutForEmail(
       extractCheckoutId(reference, metadata),
     )

@@ -92,6 +92,67 @@ function formatOrderItemsBreakdown(items: OrderItemSummary[]) {
     .join('\n')
 }
 
+type PaystackMetadataRecord = {
+  custom_fields?: unknown
+  [key: string]: unknown
+}
+
+function getMetadataFieldValue(
+  metadata: PaystackMetadataRecord | undefined,
+  variableName: string,
+): string | null {
+  const directValue =
+    typeof metadata === 'object' && metadata !== null
+      ? metadata[variableName]
+      : undefined
+
+  if (typeof directValue === 'string' && directValue.trim().length > 0) {
+    return directValue
+  }
+
+  if (typeof directValue === 'number' || typeof directValue === 'boolean') {
+    return String(directValue)
+  }
+
+  const customFields =
+    typeof metadata === 'object' && metadata !== null
+      ? metadata.custom_fields
+      : undefined
+
+  if (!Array.isArray(customFields)) {
+    return null
+  }
+
+  const field = customFields.find(
+    (item) =>
+      typeof item === 'object' &&
+      item !== null &&
+      'variable_name' in item &&
+      item.variable_name === variableName,
+  ) as { value?: unknown } | undefined
+
+  if (typeof field?.value === 'string' && field.value.trim().length > 0) {
+    return field.value
+  }
+
+  if (typeof field?.value === 'number' || typeof field?.value === 'boolean') {
+    return String(field.value)
+  }
+
+  return null
+}
+
+function resolveOrderItemsBreakdown(
+  items: OrderItemSummary[],
+  metadata?: PaystackMetadataRecord,
+): string {
+  if (items.length) {
+    return formatOrderItemsBreakdown(items)
+  }
+
+  return getMetadataFieldValue(metadata, 'order_items_breakdown') ?? 'N/A'
+}
+
 function buildOrderEmailHtml({
   amount,
   customerEmail,
@@ -397,6 +458,7 @@ export const recordOrderNotificationEmailStatus = internalMutation({
 export const getOrderEmailData = internalQuery({
   args: {
     checkoutId: v.id('checkouts'),
+    metadataFallback: v.optional(v.any()),
   },
   handler: async (ctx, args): Promise<OrderEmailData> => {
     const checkout = await ctx.db.get(args.checkoutId)
@@ -424,9 +486,14 @@ export const getOrderEmailData = internalQuery({
       .filter(Boolean)
       .join('\n')
 
-    const orderItemsBreakdown = items.length
-      ? formatOrderItemsBreakdown(items)
-      : 'N/A'
+    const metadataFallback =
+      typeof args.metadataFallback === 'object' && args.metadataFallback !== null
+        ? (args.metadataFallback as PaystackMetadataRecord)
+        : undefined
+    const orderItemsBreakdown = resolveOrderItemsBreakdown(
+      items,
+      metadataFallback,
+    )
 
     return {
       checkoutId: checkout._id,
@@ -465,13 +532,21 @@ export const verifyPaystackPayment = action({
     )
     const data = await response.json()
     if (!response.ok) {
+      console.error(
+        'Paystack verify request failed:',
+        JSON.stringify(data, null, 2),
+      )
       throw new Error(data.message || 'Payment verification request failed')
     }
     if (data.status && data.data?.status === 'success') {
+      const verifiedMetadata = data.data?.metadata as
+        | PaystackMetadataRecord
+        | undefined
       const order: OrderEmailData = await ctx.runQuery(
         internal.commerce.getOrderEmailData,
         {
           checkoutId: args.checkoutId,
+          metadataFallback: verifiedMetadata,
         },
       )
       const paymentResult: { alreadyPaid: boolean } = await ctx.runMutation(
@@ -503,6 +578,10 @@ export const verifyPaystackPayment = action({
         alreadyPaid: paymentResult.alreadyPaid,
       }
     }
+    console.error(
+      'Paystack verify response was not successful:',
+      JSON.stringify(data, null, 2),
+    )
     throw new Error('Payment verification failed')
   },
 })
