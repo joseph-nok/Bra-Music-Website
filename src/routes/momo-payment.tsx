@@ -91,12 +91,68 @@ function MoMoPaymentPage() {
     )
   }
 
+  const customerName =
+    `${checkout.shippingAddress.firstName} ${checkout.shippingAddress.lastName}`.trim()
+  const deliveryInfo = [
+    customerName,
+    checkout.shippingAddress.addressLine1,
+    `${checkout.shippingAddress.city}, ${checkout.shippingAddress.region}`,
+    checkout.shippingAddress.country,
+  ]
+    .filter(Boolean)
+    .join('\n')
+  const orderItemsBreakdown = checkout.items?.length
+    ? checkout.items
+        .map(
+          (item: {
+            quantity: number
+            productName: string
+            color: string
+            size: string
+            currency: string
+            lineTotal: number
+          }) =>
+            `${item.quantity}x ${item.productName} - ${item.color}, ${item.size} - ${item.currency} ${item.lineTotal.toFixed(2)}`,
+        )
+        .join('\n')
+    : 'N/A'
+  const phoneNumber = checkout.shippingAddress.phone || checkout.momoNumber
+
   const paystackConfig = {
-    reference: `${checkout?._id}_${Date.now()}`,
-    email: checkout?.email || '',
-    amount: Math.round((checkout?.totalAmount || 0) * 100),
+    reference: `${checkout._id}_${Date.now()}`,
+    email: checkout.email || '',
+    amount: Math.round((checkout.totalAmount || 0) * 100),
     publicKey: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
-    currency: checkout?.currency || 'GHS',
+    currency: checkout.currency || 'GHS',
+    metadata: {
+      checkout_id: checkout._id,
+      customer_name: customerName,
+      phone_number: phoneNumber,
+      delivery_info: deliveryInfo,
+      order_items_breakdown: orderItemsBreakdown,
+      custom_fields: [
+        {
+          display_name: 'Customer Name',
+          variable_name: 'customer_name',
+          value: customerName,
+        },
+        {
+          display_name: 'Phone Number',
+          variable_name: 'phone_number',
+          value: phoneNumber,
+        },
+        {
+          display_name: 'Delivery Info',
+          variable_name: 'delivery_info',
+          value: deliveryInfo,
+        },
+        {
+          display_name: 'Order Items Breakdown',
+          variable_name: 'order_items_breakdown',
+          value: orderItemsBreakdown,
+        },
+      ],
+    },
   }
 
   const onSuccess = async (response: any) => {

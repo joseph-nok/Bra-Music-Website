@@ -6,6 +6,11 @@ type PaystackCustomField = {
   value?: unknown
 }
 
+type PaystackMetadata = {
+  custom_fields?: unknown
+  [key: string]: unknown
+}
+
 type PaystackPayload = {
   event?: unknown
   data?: {
@@ -14,9 +19,7 @@ type PaystackPayload = {
     customer?: {
       email?: unknown
     }
-    metadata?: {
-      custom_fields?: unknown
-    }
+    metadata?: PaystackMetadata
   }
 }
 
@@ -32,9 +35,23 @@ const jsonResponse = (body: Record<string, string>, status: number) =>
   })
 
 const getCustomFieldValue = (
-  customFields: unknown,
+  metadata: PaystackMetadata | undefined,
   variableName: string,
 ): string => {
+  const directValue =
+    typeof metadata === 'object' ? metadata[variableName] : undefined
+
+  if (typeof directValue === 'string' && directValue.trim().length > 0) {
+    return directValue
+  }
+
+  if (typeof directValue === 'number' || typeof directValue === 'boolean') {
+    return String(directValue)
+  }
+
+  const customFields =
+    typeof metadata === 'object' ? metadata.custom_fields : undefined
+
   if (!Array.isArray(customFields)) {
     return 'N/A'
   }
@@ -193,7 +210,7 @@ export const POST = async ({ request }: { request: Request }) => {
     }
 
     const transaction = payload.data
-    const customFields = transaction?.metadata?.custom_fields
+    const metadata = transaction?.metadata
     const amount = formatGhsAmount(transaction?.amount)
     const customerEmail =
       typeof transaction?.customer?.email === 'string'
@@ -201,11 +218,11 @@ export const POST = async ({ request }: { request: Request }) => {
         : 'N/A'
     const reference =
       typeof transaction?.reference === 'string' ? transaction.reference : 'N/A'
-    const customerName = getCustomFieldValue(customFields, 'customer_name')
-    const phoneNumber = getCustomFieldValue(customFields, 'phone_number')
-    const deliveryInfo = getCustomFieldValue(customFields, 'delivery_info')
+    const customerName = getCustomFieldValue(metadata, 'customer_name')
+    const phoneNumber = getCustomFieldValue(metadata, 'phone_number')
+    const deliveryInfo = getCustomFieldValue(metadata, 'delivery_info')
     const orderItemsBreakdown = getCustomFieldValue(
-      customFields,
+      metadata,
       'order_items_breakdown',
     )
 

@@ -128,6 +128,10 @@ ${data.cart
           amount: amountInPesewas,
           currency: 'GHS',
           metadata: {
+            customer_name: data.customerName,
+            phone_number: data.phone,
+            delivery_info: markdownAddress,
+            order_items_breakdown: markdownCartSummary,
             custom_fields: [
               {
                 display_name: 'Customer Name',

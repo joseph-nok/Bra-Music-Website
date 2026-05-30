@@ -307,7 +307,17 @@ export const getCheckout = query({
     checkoutId: v.id('checkouts'),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.checkoutId)
+    const checkout = await ctx.db.get(args.checkoutId)
+    if (!checkout) {
+      return null
+    }
+
+    const items = await ctx.db
+      .query('checkoutItems')
+      .withIndex('by_checkoutId', (q) => q.eq('checkoutId', args.checkoutId))
+      .collect()
+
+    return { ...checkout, items }
   },
 })
 
