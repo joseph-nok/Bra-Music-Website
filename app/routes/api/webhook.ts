@@ -48,7 +48,7 @@ type CheckoutForEmail = {
     region: string
     city: string
   }
-  items: CheckoutItem[]
+  items?: CheckoutItem[]
 }
 
 const isPaystackCustomField = (value: unknown): value is PaystackCustomField =>
@@ -137,6 +137,17 @@ const formatCheckoutOrderItems = (items: CheckoutItem[]): string => {
       return `${item.quantity}x ${productName} - Color: ${item.color.trim()}, Size: ${item.size.trim()}`
     })
     .join('\n')
+}
+
+const resolveOrderItemsBreakdown = (
+  checkout: CheckoutForEmail | null,
+  metadata: PaystackMetadata | undefined,
+): string => {
+  if (checkout?.items?.length) {
+    return formatCheckoutOrderItems(checkout.items)
+  }
+
+  return getCustomFieldValue(metadata, 'order_items_breakdown')
 }
 
 const extractCheckoutId = (
@@ -333,9 +344,7 @@ export const POST = async ({ request }: { request: Request }) => {
           .filter(Boolean)
           .join('\n')
       : getCustomFieldValue(metadata, 'delivery_info')
-    const orderItemsBreakdown = checkout
-      ? formatCheckoutOrderItems(checkout.items)
-      : getCustomFieldValue(metadata, 'order_items_breakdown')
+    const orderItemsBreakdown = resolveOrderItemsBreakdown(checkout, metadata)
     const displayAmount = checkout
       ? formatCheckoutAmount(checkout.totalAmount)
       : amount
