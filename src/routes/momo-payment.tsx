@@ -1,9 +1,9 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery, useAction } from 'convex/react'
-import React, { Suspense, useEffect, useMemo, useState } from 'react'
+import React, { Suspense, useMemo, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
-import { paystackError, paystackLog, sanitizeForLog } from '../lib/paystack-debug'
+import { paystackErr, paystackInfo } from '../lib/paystack-log'
 
 type MomoPaymentSearch = {
   checkoutId: string
@@ -49,38 +49,6 @@ function MoMoPaymentPage() {
       : 'skip',
   )
   const verifyPayment = useAction(convexApi.commerce.verifyPaystackPayment)
-
-  useEffect(() => {
-    paystackLog('MOMO PAYMENT', 'Component mounted', {
-      checkoutId: checkoutId || undefined,
-    })
-  }, [checkoutId])
-
-  useEffect(() => {
-    if (checkout === undefined) {
-      paystackLog('MOMO PAYMENT', 'Checkout query loading', {
-        checkoutId,
-      })
-      return
-    }
-
-    if (checkout === null) {
-      paystackLog('MOMO PAYMENT', 'Checkout not found', { checkoutId })
-      return
-    }
-
-    paystackLog('MOMO PAYMENT', 'Checkout loaded', {
-      checkoutId: checkout._id,
-      checkoutPayload: sanitizeForLog({
-        email: checkout.email,
-        totalAmount: checkout.totalAmount,
-        paymentReference: checkout.paymentReference,
-        momoNumber: checkout.momoNumber,
-        status: checkout.status,
-        itemCount: checkout.items?.length ?? 0,
-      }),
-    })
-  }, [checkout, checkoutId])
 
   if (!checkoutId) {
     return (
@@ -253,84 +221,29 @@ function MoMoPaymentCheckout({
     ],
   )
 
-  useEffect(() => {
-    paystackLog('MOMO PAYMENT', 'Paystack config prepared', {
-      checkoutId: checkout._id,
-      reference: paystackConfig.reference,
-      amountGhs: checkout.totalAmount,
-      amountInPesewas: paystackConfig.amount,
-      email: checkout.email,
-      metadata: sanitizeForLog(paystackConfig.metadata),
-    })
-  }, [checkout._id, checkout.email, checkout.totalAmount, paystackConfig])
-
-  useEffect(() => {
-    paystackLog('MOMO PAYMENT', 'Loading state changed', {
-      checkoutId: checkout._id,
-      isPaying,
-      paymentStep,
-    })
-  }, [checkout._id, isPaying, paymentStep])
-
   const onSuccess = async (response: { reference?: string }) => {
     const reference = response.reference ?? 'unknown'
 
-    paystackLog('MOMO PAYMENT', 'Paystack onSuccess callback received', {
-      checkoutId: checkout._id,
-      reference,
-      response: sanitizeForLog(response as Record<string, unknown>),
-    })
+    paystackInfo('MOMO', reference, 'paystack success callback')
 
     setIsPaying(true)
-    paystackLog('MOMO PAYMENT', 'Starting server verification', {
-      checkoutId: checkout._id,
-      reference,
-    })
 
     try {
-      const verifyResult = await verifyPayment({
+      await verifyPayment({
         reference,
         checkoutId: checkout._id,
       })
-
-      paystackLog('MOMO PAYMENT', 'Verification succeeded', {
-        checkoutId: checkout._id,
-        reference,
-        verifyResult: sanitizeForLog(verifyResult as Record<string, unknown>),
-      })
-
       setPaymentStep('success')
-      paystackLog('MOMO PAYMENT', 'Payment step set to success', {
-        checkoutId: checkout._id,
-        reference,
-      })
     } catch (error) {
-      paystackError(
-        'MOMO PAYMENT',
-        'Payment verification failed',
-        {
-          checkoutId: checkout._id,
-          reference,
-        },
-        error,
-      )
+      paystackErr('MOMO', reference, 'payment verification failed', error)
       alert('Payment verification failed. Please contact support.')
     } finally {
       setIsPaying(false)
-      paystackLog('MOMO PAYMENT', 'Payment flow finished', {
-        checkoutId: checkout._id,
-        reference,
-        isPaying: false,
-      })
     }
   }
 
   const onClose = () => {
     setIsPaying(false)
-    paystackLog('MOMO PAYMENT', 'Paystack modal closed by user', {
-      checkoutId: checkout._id,
-      reference: paystackConfig.reference,
-    })
   }
 
   if (paymentStep === 'success') {
@@ -405,10 +318,7 @@ function MoMoPaymentCheckout({
                 isPaying={isPaying}
                 isPaid={checkout.status === 'paid'}
                 onInitiate={() => {
-                  paystackLog('MOMO PAYMENT', 'Payment button clicked', {
-                    checkoutId: checkout._id,
-                    reference: paystackConfig.reference,
-                  })
+                  paystackInfo('MOMO', paystackConfig.reference, 'payment button clicked')
                   setIsPaying(true)
                 }}
               />

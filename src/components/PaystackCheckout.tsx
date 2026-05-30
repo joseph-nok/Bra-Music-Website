@@ -1,5 +1,4 @@
 import { usePaystackPayment } from 'react-paystack'
-import { paystackLog } from '../lib/paystack-debug'
 
 interface PaystackCheckoutProps {
   config: {
@@ -30,22 +29,8 @@ export default function PaystackCheckout({
       type="button"
       disabled={isPaying || isPaid}
       onClick={() => {
-        paystackLog('MOMO PAYMENT', 'Opening Paystack inline checkout', {
-          reference: config.reference,
-          checkoutId:
-            typeof config.metadata === 'object' &&
-            config.metadata !== null &&
-            'checkout_id' in config.metadata
-              ? String(config.metadata.checkout_id)
-              : undefined,
-          amountInPesewas: config.amount,
-          email: config.email,
-        })
         onInitiate()
         setTimeout(() => {
-          paystackLog('MOMO PAYMENT', 'Initializing Paystack payment modal', {
-            reference: config.reference,
-          })
           initializePayment({ onSuccess, onClose })
         }, 100)
       }}
